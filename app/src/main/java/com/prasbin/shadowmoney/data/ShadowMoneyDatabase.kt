@@ -50,9 +50,9 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
                 `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 `name` TEXT NOT NULL,
                 `type` INTEGER NOT NULL,
-                `opening_balance_minor` INTEGER NOT NULL,
-                `is_active` INTEGER NOT NULL,
-                `created_timestamp` INTEGER NOT NULL
+                `openingBalanceMinor` INTEGER NOT NULL,
+                `isActive` INTEGER NOT NULL,
+                `createdTimestamp` INTEGER NOT NULL
             )
         """.trimIndent())
         database.execSQL("""
@@ -60,43 +60,43 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
                 `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 `name` TEXT NOT NULL,
                 `direction` INTEGER NOT NULL,
-                `is_active` INTEGER NOT NULL,
-                `is_system` INTEGER NOT NULL,
-                `created_timestamp` INTEGER NOT NULL
+                `isActive` INTEGER NOT NULL,
+                `isSystem` INTEGER NOT NULL,
+                `createdTimestamp` INTEGER NOT NULL
             )
         """.trimIndent())
         database.execSQL("""
             CREATE TABLE IF NOT EXISTS `transactions` (
                 `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                `account_id` INTEGER NOT NULL,
-                `category_id` INTEGER,
-                `amount_minor` INTEGER NOT NULL,
+                `accountId` INTEGER NOT NULL,
+                `categoryId` INTEGER,
+                `amountMinor` INTEGER NOT NULL,
                 `direction` INTEGER NOT NULL,
-                `transaction_timestamp` INTEGER NOT NULL,
+                `transactionTimestamp` INTEGER NOT NULL,
                 `note` TEXT NOT NULL,
-                `created_timestamp` INTEGER NOT NULL,
+                `createdTimestamp` INTEGER NOT NULL,
                 `source` TEXT NOT NULL,
-                FOREIGN KEY(`account_id`) REFERENCES `accounts`(`id`) ON DELETE CASCADE,
-                FOREIGN KEY(`category_id`) REFERENCES `categories`(`id`) ON DELETE SET NULL
+                FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
             )
         """.trimIndent())
         database.execSQL("""
             CREATE TABLE IF NOT EXISTS `goals` (
                 `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 `name` TEXT NOT NULL,
-                `target_amount_minor` INTEGER NOT NULL,
-                `account_id` INTEGER,
-                `deadline_timestamp` INTEGER NOT NULL,
-                `is_active` INTEGER NOT NULL,
-                `is_completed` INTEGER NOT NULL,
-                `created_timestamp` INTEGER NOT NULL,
-                `updated_timestamp` INTEGER NOT NULL,
-                FOREIGN KEY(`account_id`) REFERENCES `accounts`(`id`) ON DELETE SET NULL
+                `targetAmountMinor` INTEGER NOT NULL,
+                `accountId` INTEGER,
+                `deadlineTimestamp` INTEGER NOT NULL,
+                `isActive` INTEGER NOT NULL,
+                `isCompleted` INTEGER NOT NULL,
+                `createdTimestamp` INTEGER NOT NULL,
+                `updatedTimestamp` INTEGER NOT NULL,
+                FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
             )
         """.trimIndent())
-        database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_account_id` ON `transactions` (`account_id`)")
-        database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_category_id` ON `transactions` (`category_id`)")
-        database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_transaction_timestamp` ON `transactions` (`transaction_timestamp`)")
-        database.execSQL("CREATE INDEX IF NOT EXISTS `index_goals_account_id` ON `goals` (`account_id`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_accountId` ON `transactions` (`accountId`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_categoryId` ON `transactions` (`categoryId`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_transactionTimestamp` ON `transactions` (`transactionTimestamp`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_goals_accountId` ON `goals` (`accountId`)")
     }
 }

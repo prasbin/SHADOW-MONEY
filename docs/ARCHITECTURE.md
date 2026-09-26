@@ -57,14 +57,14 @@ Uses Long arithmetic (100 paisa = 1 NPR). Never Float or Double.
 
 ### Delete Semantics
 
-- Accounts: Archive/inactive only (no cascade-delete with transactions)
-- Categories: SET_NULL on transactions if deleted; historical data preserved
-- Transactions: Retain historical record; no cascade-delete
-- Goals: Independent; archive/inactive only
+- Accounts: Archive/inactive preferred (`AccountDao.archive`). FK `transactions.accountId → accounts.id` is `RESTRICT`: deleting an account with historical transactions is blocked, history can never cascade-disappear. Empty accounts may still be deleted.
+- Categories: Archive preferred (`CategoryDao.archive`); FK `transactions.categoryId → categories.id` is `SET NULL`, so deleting a category nulls the reference and preserves the transaction.
+- Transactions: Historical records are never cascade-deleted; only explicit `TransactionDao.delete` removes one, leaving its account/category intact.
+- Goals: FK `goals.accountId → accounts.id` is `SET NULL`; archive/inactive preferred.
 
 ### Migration (Phase 1 → Phase 2)
 
-`MIGRATION_1_2` drops the `placeholder` table and creates all four entity tables. Tested via `MigrationTest`.
+Phase 1 v1 contained only the structural `placeholder(id, name)` table with no user financial data. `MIGRATION_1_2` drops `placeholder` (intentional structural removal, no user-data loss) and creates `accounts`, `categories`, `transactions`, `goals` with camelCase Room columns, safe FK actions (`RESTRICT`/`SET NULL`, no `CASCADE`), and indices (`index_transactions_accountId`, `index_transactions_categoryId`, `index_transactions_transactionTimestamp`, `index_goals_accountId`). Verified by genuine v1 → v2 tests in `MigrationTest` (creates a v1 file, runs the actual `MIGRATION_1_2`, reopens via Room) and `DeleteArchiveSemanticsTest`.
 
 ### Dependencies
 

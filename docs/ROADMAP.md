@@ -8,7 +8,7 @@ The foundational financial data model has been implemented with:
 - Room database v2 (accounts, categories, transactions, goals)
 - Long minor-unit monetary representation
 - Explicit migration from Phase 1 to Phase 2
-- 17 passing unit/database/migration tests
+- 42 passing unit/database/migration tests
 
 ## Roadmap
 

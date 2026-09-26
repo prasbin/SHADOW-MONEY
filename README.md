@@ -62,17 +62,19 @@ Help the user work toward consistently earning at least **NPR 100,000/month**.
 
 ## Migration
 
-Phase 1 → Phase 2 migration (`MIGRATION_1_2`) drops the `placeholder` table and creates all four entity tables. Tested and verified.
+Phase 1 v1 contained only the structural `placeholder` table (no user financial data). Phase 1 → Phase 2 migration (`MIGRATION_1_2`) drops `placeholder` and creates all four entity tables with safe FK actions (`transactions.accountId` RESTRICT, `transactions.categoryId` SET NULL, `goals.accountId` SET NULL; no CASCADE). Verified by genuine v1 → v2 migration tests.
 
 ## Testing Status
 
-**Phase 2 Tests: 17 tests PASSING**
+**Phase 2 Tests: 42 tests PASSING**
 - Money arithmetic (5 tests)
 - Account database (5 tests)
 - Category database (5 tests)
 - Transaction database (5 tests)
 - Goal database (3 tests)
-- Migration (4 tests)
+- Migration (7 tests: 4 fresh-DB checks + 3 genuine v1 → v2 path tests)
+- Delete/archive semantics (8 tests)
+- App (4 tests)
 
 ## GitHub Recovery
 
