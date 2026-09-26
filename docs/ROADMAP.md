@@ -1,12 +1,14 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 1 — Android Foundation
+## Current Status: Phase 2 — Financial Data Model ✅ COMPLETE
 
-The application shell has been created with:
+The foundational financial data model has been implemented with:
 - Dark futuristic Material 3 theme
 - Navigation skeleton
-- Room database foundation
-- Basic activity and app entry point
+- Room database v2 (accounts, categories, transactions, goals)
+- Long minor-unit monetary representation
+- Explicit migration from Phase 1 to Phase 2
+- 17 passing unit/database/migration tests
 
 ## Roadmap
 
@@ -14,7 +16,7 @@ The application shell has been created with:
 |-------|------|--------|
 | 0 | Environment Audit | ✅ Complete |
 | 1 | Android Foundation | ✅ Complete |
-| 2 | Financial Data Model | ⬜ Planned |
+| 2 | Financial Data Model | ✅ Complete |
 | 3 | Dashboard | ⬜ Planned |
 | 4 | Transaction Intelligence | ⬜ Planned |
 | 5 | Budgets | ⬜ Planned |

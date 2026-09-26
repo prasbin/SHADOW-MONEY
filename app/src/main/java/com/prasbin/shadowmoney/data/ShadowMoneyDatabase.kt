@@ -1,33 +1,102 @@
 package com.prasbin.shadowmoney.data
 
-import androidx.room.Database
-import androidx.room.RoomDatabase
+import android.content.Context
+import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.prasbin.shadowmoney.data.model.Account
+import com.prasbin.shadowmoney.data.model.Category
+import com.prasbin.shadowmoney.data.model.Goal
+import com.prasbin.shadowmoney.data.model.Transaction
+import kotlinx.coroutines.flow.Flow
 
 @Database(
-    entities = [com.prasbin.shadowmoney.data.model.PlaceholderEntity::class],
-    version = 1,
-    exportSchema = false
+    entities = [Account::class, Category::class, Transaction::class, Goal::class],
+    version = 2,
+    exportSchema = true
 )
 abstract class ShadowMoneyDatabase : RoomDatabase() {
 
-    abstract fun shadowMoneyDao(): ShadowMoneyDao
+    abstract fun accountDao(): AccountDao
+    abstract fun categoryDao(): CategoryDao
+    abstract fun transactionDao(): TransactionDao
+    abstract fun goalDao(): GoalDao
 
     companion object {
         @Volatile
         private var INSTANCE: ShadowMoneyDatabase? = null
 
-        fun getInstance(appContext: android.content.Context): ShadowMoneyDatabase {
+        fun getInstance(appContext: Context): ShadowMoneyDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = androidx.room.Room.databaseBuilder(
                     appContext.applicationContext,
                     ShadowMoneyDatabase::class.java,
                     "shadow_money_database"
                 )
-                    .fallbackToDestructiveMigration(true)
+                    .addMigrations(MIGRATION_1_2)
                     .build()
                 INSTANCE = instance
                 instance
             }
         }
+    }
+}
+
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("DROP TABLE IF EXISTS placeholder")
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `accounts` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `name` TEXT NOT NULL,
+                `type` INTEGER NOT NULL,
+                `opening_balance_minor` INTEGER NOT NULL,
+                `is_active` INTEGER NOT NULL,
+                `created_timestamp` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `categories` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `name` TEXT NOT NULL,
+                `direction` INTEGER NOT NULL,
+                `is_active` INTEGER NOT NULL,
+                `is_system` INTEGER NOT NULL,
+                `created_timestamp` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `transactions` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `account_id` INTEGER NOT NULL,
+                `category_id` INTEGER,
+                `amount_minor` INTEGER NOT NULL,
+                `direction` INTEGER NOT NULL,
+                `transaction_timestamp` INTEGER NOT NULL,
+                `note` TEXT NOT NULL,
+                `created_timestamp` INTEGER NOT NULL,
+                `source` TEXT NOT NULL,
+                FOREIGN KEY(`account_id`) REFERENCES `accounts`(`id`) ON DELETE CASCADE,
+                FOREIGN KEY(`category_id`) REFERENCES `categories`(`id`) ON DELETE SET NULL
+            )
+        """.trimIndent())
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `goals` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `name` TEXT NOT NULL,
+                `target_amount_minor` INTEGER NOT NULL,
+                `account_id` INTEGER,
+                `deadline_timestamp` INTEGER NOT NULL,
+                `is_active` INTEGER NOT NULL,
+                `is_completed` INTEGER NOT NULL,
+                `created_timestamp` INTEGER NOT NULL,
+                `updated_timestamp` INTEGER NOT NULL,
+                FOREIGN KEY(`account_id`) REFERENCES `accounts`(`id`) ON DELETE SET NULL
+            )
+        """.trimIndent())
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_account_id` ON `transactions` (`account_id`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_category_id` ON `transactions` (`category_id`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_transaction_timestamp` ON `transactions` (`transaction_timestamp`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_goals_account_id` ON `goals` (`account_id`)")
     }
 }
