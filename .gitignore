@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+.kotlin/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+
+# Android / app build outputs
+**/build/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Local SDK + signing (machine-specific, secrets)
+local.properties
+*.jks
+*.keystore
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Kotlin / misc
+*.class
+
+# Generated
+**/generated/
+**/build/generated/
