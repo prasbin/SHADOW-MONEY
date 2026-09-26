@@ -86,6 +86,8 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.test:runner:1.6.1")
+    testImplementation("androidx.test:rules:1.6.1")
     testImplementation("androidx.room:room-testing:$roomVersion")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("org.xerial:sqlite-jdbc:3.41.2.2")

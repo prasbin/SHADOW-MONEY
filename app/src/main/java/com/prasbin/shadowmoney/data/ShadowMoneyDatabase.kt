@@ -4,7 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [],
+    entities = [com.prasbin.shadowmoney.data.model.PlaceholderEntity::class],
     version = 1,
     exportSchema = false
 )
@@ -23,15 +23,11 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
                     ShadowMoneyDatabase::class.java,
                     "shadow_money_database"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(true)
                     .build()
                 INSTANCE = instance
                 instance
             }
         }
     }
-}
-
-interface ShadowMoneyDao {
-    // Phase 2: accounts, transactions, categories, goals
 }

@@ -20,15 +20,15 @@ fun SystemCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .border(
+                width = 1.dp,
+                color = BorderColor,
+                shape = RoundedCornerShape(12.dp)
+            ),
         shape = RoundedCornerShape(12.dp),
         color = CardColor,
-        border = border(
-            width = 1.dp,
-            color = BorderColor,
-            shape = RoundedCornerShape(12.dp)
-        ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+        shadowElevation = 4.dp
     ) {
         Column(
             modifier = Modifier
@@ -66,15 +66,16 @@ fun SystemPanel(
     children: @Composable ColumnScope.() -> Unit
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = BorderColor,
+                shape = RoundedCornerShape(12.dp)
+            ),
         shape = RoundedCornerShape(12.dp),
         color = DarkSurfaceVariant,
-        border = border(
-            width = 1.dp,
-            color = BorderColor,
-            shape = RoundedCornerShape(12.dp)
-        ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+        shadowElevation = 2.dp
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
