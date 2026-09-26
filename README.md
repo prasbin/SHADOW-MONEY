@@ -56,6 +56,24 @@ gradlew test
 gradlew lint
 ```
 
+### Testing Status
+
+**Phase 1 Tests: 4/4 PASSING**
+- `packageName_isCorrect`
+- `database_isConstructible`
+- `dao_isInterface`
+- `versionCode_isOne`
+
+## GitHub Recovery
+
+If the local project is deleted or lost:
+
+1. Clone the official repository: `git clone https://github.com/prasbin/SHADOW-MONEY.git`
+2. Open the project in Android Studio
+3. Configure the local development environment (Android SDK, JDK)
+4. Keep signing credentials/keystore **outside** Git (never commit them)
+5. Continue from the latest verified phase
+
 ## Status Bar
 
 Phase 1 Foundation — Navigation shell and theme created. Financial data models will be added in Phase 2.
