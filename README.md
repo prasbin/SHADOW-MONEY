@@ -4,13 +4,15 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 2 — Financial Data Model** ✅ COMPLETE
+**Phase 3 — Dashboard** ✅ COMPLETE
 
-The foundational financial data model has been implemented. The database now contains:
-- `accounts` — user financial accounts/wallets
-- `categories` — income/outflow classification
-- `transactions` — financial events with exact Long minor units
-- `goals` — financial goal tracking
+The Dashboard is functional and displays real data from the Phase 2 Room financial model:
+- Financial summary (total balance, income, outflow) with explicit empty state
+- Account balances (derived, archived accounts marked)
+- Recent transactions (latest 20)
+- Outflow by category (uncategorized transactions handled)
+- Goal progress (linked-account based)
+- Persistent trust label: "Local records only · not a bank balance."
 
 ## Application ID
 
@@ -66,14 +68,15 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 
 ## Testing Status
 
-**Phase 2 Tests: 42 tests PASSING**
+**Phase 3 Tests: 52 tests PASSING**
 - Money arithmetic (5 tests)
 - Account database (5 tests)
 - Category database (5 tests)
 - Transaction database (5 tests)
 - Goal database (3 tests)
-- Migration (7 tests: 4 fresh-DB checks + 3 genuine v1 → v2 path tests)
+- Migration (7 tests)
 - Delete/archive semantics (8 tests)
+- Dashboard ViewModel (10 tests)
 - App (4 tests)
 
 ## GitHub Recovery

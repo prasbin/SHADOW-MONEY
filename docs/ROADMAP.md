@@ -1,14 +1,22 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 2 — Financial Data Model ✅ COMPLETE
+## Current Status: Phase 3 — Dashboard ✅ COMPLETE
 
-The foundational financial data model has been implemented with:
+The Dashboard is functional and displays real data from the Phase 2 Room financial model:
+- Financial summary (derived balance, income, outflow) with empty state
+- Account balances (derived, archived marked)
+- Recent transactions (latest 20)
+- Outflow by category (uncategorized handled)
+- Goal progress (linked-account based)
+- Trust label: "Local records only · not a bank balance."
+
+Phase 2 foundation:
 - Dark futuristic Material 3 theme
 - Navigation skeleton
 - Room database v2 (accounts, categories, transactions, goals)
 - Long minor-unit monetary representation
 - Explicit migration from Phase 1 to Phase 2
-- 42 passing unit/database/migration tests
+- 52 passing unit/database/migration/dashboard tests
 
 ## Roadmap
 
@@ -17,7 +25,7 @@ The foundational financial data model has been implemented with:
 | 0 | Environment Audit | ✅ Complete |
 | 1 | Android Foundation | ✅ Complete |
 | 2 | Financial Data Model | ✅ Complete |
-| 3 | Dashboard | ⬜ Planned |
+| 3 | Dashboard | ✅ Complete |
 | 4 | Transaction Intelligence | ⬜ Planned |
 | 5 | Budgets | ⬜ Planned |
 | 6 | Work / Income / Project Tracker | ⬜ Planned |
