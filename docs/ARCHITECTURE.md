@@ -81,6 +81,26 @@ The Dashboard route renders real data from the Phase 2 Room model via Room → D
 
 **Trust label**: "Local records only · not a bank balance." is shown in the TopAppBar and the empty state.
 
+### Transaction Intelligence (Phase 4)
+
+Deterministic, offline intelligence computed from stored Room records. No external AI, no network, no stored intelligence tables — all insights are recomputed transiently from the existing data model.
+
+**Architecture**: pure-Kotlin domain package `com.prasbin.shadowmoney.intelligence` (no Android dependencies, plain-JUnit testable) + `data/IntelligenceRepository` (Room-backed loading) + `IntelligenceViewModel` (state) + Intelligence section on the Dashboard.
+
+**Analysis window**: 400 days, `[now − 400 days, now]` (both inclusive), based on `transactionTimestamp`. The previous comparable period is the 400 days before it (`[now − 800 days, now − 400 days)`). The repository loads an 800-day slice (bounded) and the engine applies the exact boundaries. Transactions outside the window never contaminate period calculations.
+
+**Period calculations** (`PeriodCalculator`): window income/outflow/net, previous-period stats, transaction counts, per-category and per-account outflow, trend percent `(current − previous) × 100 / previous` (null when previous is 0; integer division truncates toward zero), history span in days. All Long minor-unit arithmetic.
+
+**Recurring-outflow detection** (`RecurringDetector`, ANALYSIS): groups outflows by normalized note (lowercase, trimmed, whitespace-collapsed). A group qualifies only when ALL hold: ≥ 3 occurrences in window; amounts within 10% (`max × 100 ≤ min × 110`); ≥ 2 inter-transaction gaps, each ≥ 1 day, with `maxGap ≤ 2 × minGap`. Typical amount/interval = median (lower middle for even counts). Insufficient evidence → no insight. Never implies future payment certainty.
+
+**Unusual-spending detection** (`UnusualDetector`, ANALYSIS): (a) category-level — last-30-days category outflow vs the typical 30-day baseline derived from days 31–400 of the window; flagged only when baseline has ≥ 2 transactions, recent total ≥ NPR 500 (50,000 minor), and recent > 150% of baseline; (b) transaction-level — a single outflow > 3× the category's average transaction, with ≥ 3 category transactions and amount ≥ NPR 500. Neutral wording only ("materially above baseline", "statistical comparison, not a judgement"). Insufficient baseline → no insight.
+
+**Projection** (`ProjectionEngine`, PROJECTION): projected monthly outflow = `windowOutflow × 30 / historyDays` (integer division, truncation), only when history spans ≥ 7 days and window outflow is non-zero. Assumptions are attached to the insight ("assumes the observed daily spending rate continues", "projection only — not a guarantee"). Not an income promise; no job/investment/market prediction.
+
+**Classification**: every `Insight` carries `InsightKind` FACT / CALCULATION / ANALYSIS / PROJECTION. FACT = direct record facts; CALCULATION = deterministic arithmetic over records; ANALYSIS = detected patterns/statistical comparisons; PROJECTION = forward estimates with assumptions. The UI renders a colored kind badge on every insight and never presents analysis/projection as fact.
+
+**Insufficient data**: empty DB, too few transactions, or < 7 days history → `sufficientData = false`, detectors return nothing, UI shows "Insufficient data…" / "No insight found". Insights are never manufactured.
+
 ### Dependencies
 
 Same versions as SHADOW LEARN project for consistency:

@@ -1,14 +1,22 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 3 — Dashboard ✅ COMPLETE
+## Current Status: Phase 4 — Transaction Intelligence ✅ COMPLETE
 
-The Dashboard is functional and displays real data from the Phase 2 Room financial model:
+Deterministic, offline intelligence over stored records:
+- 400-day analysis window with explicit boundaries
+- Period calculations (income, outflow, net, previous-period trends)
+- Recurring-outflow detection (ANALYSIS)
+- Unusual-spending detection vs baseline (ANALYSIS)
+- Monthly outflow projection with assumptions (PROJECTION)
+- FACT / CALCULATION / ANALYSIS / PROJECTION classification on every insight
+- Intelligence section on the Dashboard; trust label retained
+
+Phase 3 Dashboard:
 - Financial summary (derived balance, income, outflow) with empty state
 - Account balances (derived, archived marked)
 - Recent transactions (latest 20)
 - Outflow by category (uncategorized handled)
 - Goal progress (linked-account based)
-- Trust label: "Local records only · not a bank balance."
 
 Phase 2 foundation:
 - Dark futuristic Material 3 theme
@@ -16,7 +24,7 @@ Phase 2 foundation:
 - Room database v2 (accounts, categories, transactions, goals)
 - Long minor-unit monetary representation
 - Explicit migration from Phase 1 to Phase 2
-- 52 passing unit/database/migration/dashboard tests
+- 93 passing unit/database/migration/dashboard/intelligence tests
 
 ## Roadmap
 
@@ -26,7 +34,7 @@ Phase 2 foundation:
 | 1 | Android Foundation | ✅ Complete |
 | 2 | Financial Data Model | ✅ Complete |
 | 3 | Dashboard | ✅ Complete |
-| 4 | Transaction Intelligence | ⬜ Planned |
+| 4 | Transaction Intelligence | ✅ Complete |
 | 5 | Budgets | ⬜ Planned |
 | 6 | Work / Income / Project Tracker | ⬜ Planned |
 | 7 | Goals + Secret Target | ⬜ Planned |

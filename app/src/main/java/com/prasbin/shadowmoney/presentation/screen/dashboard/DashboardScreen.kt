@@ -13,6 +13,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +36,21 @@ import java.util.Locale
 private const val TRUST_LABEL = "Local records only · not a bank balance."
 
 private val dashboardDateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+private val windowDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+
+private fun insightKindLabel(kind: com.prasbin.shadowmoney.intelligence.InsightKind): String = when (kind) {
+    com.prasbin.shadowmoney.intelligence.InsightKind.FACT -> "FACT"
+    com.prasbin.shadowmoney.intelligence.InsightKind.CALCULATION -> "CALCULATION"
+    com.prasbin.shadowmoney.intelligence.InsightKind.ANALYSIS -> "ANALYSIS"
+    com.prasbin.shadowmoney.intelligence.InsightKind.PROJECTION -> "PROJECTION"
+}
+
+private fun insightKindColor(kind: com.prasbin.shadowmoney.intelligence.InsightKind): Color = when (kind) {
+    com.prasbin.shadowmoney.intelligence.InsightKind.FACT -> NeonCyan
+    com.prasbin.shadowmoney.intelligence.InsightKind.CALCULATION -> NeonGreen
+    com.prasbin.shadowmoney.intelligence.InsightKind.ANALYSIS -> NeonPurple
+    com.prasbin.shadowmoney.intelligence.InsightKind.PROJECTION -> AccentGold
+}
 
 private fun accountTypeLabel(type: Int): String = when (type) {
     ACCOUNT_TYPE_WALLET -> "Wallet"
@@ -66,6 +82,21 @@ fun DashboardScreen() {
         }
     )
     val state by viewModel.uiState.collectAsState()
+    val intelligenceViewModel: IntelligenceViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val database = ShadowMoneyDatabase.getInstance(context.applicationContext)
+                return IntelligenceViewModel(
+                    com.prasbin.shadowmoney.data.IntelligenceRepository(
+                        transactionDao = database.transactionDao(),
+                        categoryDao = database.categoryDao()
+                    )
+                ) as T
+            }
+        }
+    )
+    val intelligenceState by intelligenceViewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = {
@@ -121,6 +152,7 @@ fun DashboardScreen() {
             )
             is DashboardUiState.Content -> DashboardContent(
                 state = currentState,
+                intelligenceState = intelligenceState,
                 modifier = Modifier.padding(innerPadding)
             )
         }
@@ -195,6 +227,7 @@ private fun DashboardError(message: String, modifier: Modifier = Modifier) {
 @Composable
 private fun DashboardContent(
     state: DashboardUiState.Content,
+    intelligenceState: IntelligenceUiState,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -266,6 +299,9 @@ private fun DashboardContent(
                     GoalRow(view)
                 }
             }
+        }
+        item {
+            IntelligenceSection(state = intelligenceState)
         }
     }
 }
@@ -400,6 +436,100 @@ private fun GoalRow(view: com.prasbin.shadowmoney.data.GoalProgressView) {
                 text = "No account linked · target ${Money.formatNpr(goal.targetAmountMinor)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = WarningAmber
+            )
+        }
+    }
+}
+
+private const val INTELLIGENCE_DISPLAY_CAP = 3
+
+@Composable
+private fun IntelligenceSection(state: IntelligenceUiState) {
+    SystemPanel(title = "Intelligence") {
+        when (state) {
+            is IntelligenceUiState.Loading -> {
+                SectionEmptyRow("Analyzing local records…")
+            }
+            is IntelligenceUiState.Error -> {
+                Text(
+                    text = "Intelligence unavailable: ${state.message}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ErrorRed
+                )
+            }
+            is IntelligenceUiState.Content -> {
+                val report = state.report
+                Text(
+                    text = if (report.sufficientData) {
+                        "Deterministic analysis of stored records · window since ${windowDateFormat.format(Date(report.windowStart))}"
+                    } else {
+                        "Insufficient data for meaningful intelligence insights — more recorded history is needed"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (report.sufficientData) DarkOnSurfaceVariant else WarningAmber
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (report.insights.isEmpty()) {
+                    SectionEmptyRow("No insight found")
+                }
+                val analysisInsights = report.insights.filter {
+                    it.kind == com.prasbin.shadowmoney.intelligence.InsightKind.ANALYSIS
+                }
+                val otherInsights = report.insights.filter {
+                    it.kind != com.prasbin.shadowmoney.intelligence.InsightKind.ANALYSIS
+                }
+                otherInsights.forEach { insight -> InsightRow(insight) }
+                analysisInsights.take(INTELLIGENCE_DISPLAY_CAP).forEach { insight -> InsightRow(insight) }
+                if (analysisInsights.size > INTELLIGENCE_DISPLAY_CAP) {
+                    SectionEmptyRow("+${analysisInsights.size - INTELLIGENCE_DISPLAY_CAP} more analysis insights")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InsightRow(insight: com.prasbin.shadowmoney.intelligence.Insight) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = insightKindLabel(insight.kind),
+                style = MaterialTheme.typography.labelSmall,
+                fontFamily = FontFamily.Monospace,
+                color = insightKindColor(insight.kind),
+                fontWeight = FontWeight.Bold
+            )
+            if (insight.amountMinor != null) {
+                Text(
+                    text = "  ${Money.formatNpr(insight.amountMinor)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = DarkOnSurface
+                )
+            }
+        }
+        Text(
+            text = insight.title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = DarkOnSurface
+        )
+        Text(
+            text = insight.summary,
+            style = MaterialTheme.typography.bodySmall,
+            color = DarkOnSurfaceVariant
+        )
+        if (insight.evidence != null) {
+            Text(
+                text = insight.evidence,
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurfaceVariant
+            )
+        }
+        insight.assumptions.forEach { assumption ->
+            Text(
+                text = "· $assumption",
+                style = MaterialTheme.typography.labelSmall,
+                color = AccentGold
             )
         }
     }

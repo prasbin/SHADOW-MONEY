@@ -18,6 +18,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY transactionTimestamp DESC, id DESC LIMIT :limit")
     fun getRecent(limit: Int): Flow<List<Transaction>>
 
+    @Query("SELECT * FROM transactions WHERE transactionTimestamp >= :start AND transactionTimestamp <= :end ORDER BY transactionTimestamp DESC")
+    fun getTransactionsInWindow(start: Long, end: Long): Flow<List<Transaction>>
+
     @Query("SELECT COUNT(*) FROM transactions")
     fun observeTransactionCount(): Flow<Int>
 

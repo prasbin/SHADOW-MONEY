@@ -4,15 +4,16 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 3 — Dashboard** ✅ COMPLETE
+**Phase 4 — Transaction Intelligence** ✅ COMPLETE
 
-The Dashboard is functional and displays real data from the Phase 2 Room financial model:
-- Financial summary (total balance, income, outflow) with explicit empty state
-- Account balances (derived, archived accounts marked)
-- Recent transactions (latest 20)
-- Outflow by category (uncategorized transactions handled)
-- Goal progress (linked-account based)
-- Persistent trust label: "Local records only · not a bank balance."
+Deterministic, offline financial intelligence on top of the Phase 2/3 records:
+- 400-day analysis window with explicit boundaries
+- Period calculations (income, outflow, net, previous-period comparison, trends)
+- Rule-based recurring-outflow detection (ANALYSIS)
+- Unusual-spending detection vs historical baseline (ANALYSIS)
+- Monthly outflow projection with stated assumptions (PROJECTION)
+- Every insight classified FACT / CALCULATION / ANALYSIS / PROJECTION
+- Intelligence section added to the Dashboard; trust label retained
 
 ## Application ID
 
@@ -68,7 +69,7 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 
 ## Testing Status
 
-**Phase 3 Tests: 52 tests PASSING**
+**Phase 4 Tests: 93 tests PASSING**
 - Money arithmetic (5 tests)
 - Account database (5 tests)
 - Category database (5 tests)
@@ -77,6 +78,12 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 - Migration (7 tests)
 - Delete/archive semantics (8 tests)
 - Dashboard ViewModel (10 tests)
+- Period calculator (8 tests)
+- Recurring detector (9 tests)
+- Unusual detector (8 tests)
+- Projection engine (5 tests)
+- Intelligence engine (7 tests)
+- Intelligence repository wiring (4 tests)
 - App (4 tests)
 
 ## GitHub Recovery
