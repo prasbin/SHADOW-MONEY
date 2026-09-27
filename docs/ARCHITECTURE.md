@@ -70,6 +70,10 @@ Phase 1 v1 contained only the structural `placeholder(id, name)` table with no u
 
 `MIGRATION_2_3` (Room version 2 → 3) creates the `budgets` table with the unique index `index_budgets_categoryId_monthKey`, the query index `index_budgets_monthKey`, and the `RESTRICT` foreign key to `categories`. Non-destructive; all existing tables and data are preserved. Verified by `BudgetMigrationTest` (real v2 database file → actual `MIGRATION_2_3` → schema, unique-index, and FK enforcement checks plus data survival).
 
+### Migration (Phase 5 → Phase 6 / Work Tracker)
+
+`MIGRATION_3_4` (Room version 3 → 4) creates the `work_items` table with `index_work_items_status`, adds the nullable `workItemId` column to `transactions` (`INTEGER DEFAULT NULL REFERENCES work_items(id) ON DELETE SET NULL`), and creates `index_transactions_workItemId`. Non-destructive; all existing tables (accounts, categories, transactions, goals, budgets) and data are preserved. Verified by `WorkMigrationTest` (real v3 database → actual `MIGRATION_3_4` → all tables/data survive, transaction values unchanged, `workItemId` nullable, linked transaction survives work-item deletion with SET NULL).
+
 ### Dashboard (Phase 3)
 
 The Dashboard route renders real data from the Phase 2 Room model via Room → DAO/repository → ViewModel/state → Compose UI.
@@ -120,6 +124,24 @@ Local budgeting on the existing financial model. New `budgets` table (Room v3, m
 **Overall vs category interaction**: shown independently; category budgets are sub-limits, not additional money; no summing of unrelated limits.
 
 **UI**: dedicated Budgets screen (navigation route `budgets`, bottom-bar entry on the Dashboard) with month stepper, overall budget panel, category budget panels, create/edit dialog (scope toggle, category dropdown, month stepper, NPR amount parsed to minor units with exact integer arithmetic), delete action, and explicit Loading / Empty / Content / Error states. Budget changes, transaction changes, and category changes all refresh the display via Room Flow → StateFlow.
+
+### Work / Income / Project Tracker (Phase 6)
+
+A local tracker for jobs, freelance work, and projects. **The tracker is separate from financial truth**: a work item is an opportunity record; a transaction is actual money.
+
+**Work item model** (`WorkItem` entity, `work_items` table): `title`, `description`, `status` (ACTIVE / PAUSED / COMPLETED / ARCHIVED), `expectedAmountMinor` (Long), `deadlineTimestamp` (0 = none), `client`, `createdTimestamp`, `updatedTimestamp`.
+
+**Expected vs actual**: expected amount is a work/project estimate — it is NOT income. It never increases account balance, dashboard income, or budget figures. Received amount is derived from actual linked transactions: `received = SUM(amountMinor)` of `direction = 0` (INCOME) transactions where `workItemId` matches. OUTFLOW, expected amounts, projections, and unrelated income are never counted. If no linked income exists, received = 0. `remainingExpected = expected − received` (may go negative — never clamped).
+
+**Transaction link**: `transactions.workItemId → work_items.id`, nullable FK with `ON DELETE SET NULL`. Deleting a work item keeps all linked transactions with `workItemId = null` — financial history always survives. Linking/unlinking never changes a transaction amount. Linking an INCOME transaction counts it toward the work item's received total; linking an OUTFLOW transaction does not.
+
+**Status meanings**: ACTIVE (in progress), PAUSED (temporarily halted), COMPLETED (done), ARCHIVED (kept for history, hidden from default views). Archive is preferred for records with meaningful history; deletion is allowed and safe (SET NULL).
+
+**Deadlines**: Kathmandu-date comparison — NO_DEADLINE (0), UPCOMING (future), DUE_TODAY (same Kathmandu date), OVERDUE (past). Neutral wording only; no predictive claims.
+
+**UI**: Work screen (route `work`, bottom-bar entry) with status filter chips (All/Active/Paused/Completed/Archived), title search, work cards (status badge, Expected / Received / Remaining expected, deadline), FAB + form dialog (title, description, expected amount, optional deadline `yyyy-MM-dd`, client). Work detail screen (route `work/{id}`) with full details, linked transactions (unlink), and linkable transactions (link). Explicit Loading / Empty / Content / Error states. Received totals use one grouped SQL query (no N+1).
+
+**Financial integrity** (regression-tested in `FinancialIntegrityTest`): expected amounts do not change account balance, income totals, or budget figures; linked actual income remains normal financial income; linked outflow remains budget spending; deleting/archiving a work item never deletes or alters transactions.
 
 ### Dependencies
 

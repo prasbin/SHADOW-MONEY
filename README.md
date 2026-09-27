@@ -4,16 +4,16 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 5 — Budgets** ✅ COMPLETE
+**Phase 6 — Work / Income / Project Tracker** ✅ COMPLETE
 
-Real local budgeting on top of the existing financial model:
-- Overall monthly budget and per-category budgets (Long minor units, exact integer arithmetic)
-- Kathmandu (Asia/Kathmandu, UTC+05:45) calendar month boundaries
-- Spending derived from actual OUTFLOW transactions only (income/balances/projections excluded)
-- Deterministic status: Under budget (<50%), Approaching limit (50–<100%), Over budget (≥100%)
-- Create / edit / delete budgets via a dedicated Budgets screen with month navigation
-- Duplicate prevention: one overall budget per month, one category budget per category per month
-- Room migration v2 → v3 (budgets table, unique index, FK RESTRICT); all existing data preserved
+A practical local tracker for jobs, freelance work, and projects — kept strictly separate from financial truth:
+- Work items with ACTIVE / PAUSED / COMPLETED / ARCHIVED statuses
+- Expected amounts (estimates — never income) vs Received amounts (derived from actual linked INCOME transactions)
+- Optional transaction linking (`transactions.workItemId → work_items.id`, `ON DELETE SET NULL`)
+- Work list with status filter + title search; work detail with linked transactions and link/unlink actions
+- Dedicated Work screen + detail screen in the existing navigation
+- Room migration v3 → v4 (`work_items` table + nullable `workItemId`); all existing data preserved
+- Financial integrity regression tests: expected amounts never affect balance, income, or budgets
 
 ## Application ID
 
@@ -69,7 +69,7 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 
 ## Testing Status
 
-**Phase 5 Tests: 141 tests PASSING**
+**Phase 6 Tests: 185 tests PASSING**
 - Money arithmetic (5 tests)
 - Account database (5 tests)
 - Category database (5 tests)
@@ -89,6 +89,11 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 - Budget repository CRUD + spending (18 tests)
 - Budget v2→v3 migration (2 tests)
 - Budgets ViewModel (9 tests)
+- Work math / deadlines (8 tests)
+- Work repository CRUD + linking (17 tests)
+- Work v3→v4 migration (3 tests)
+- Financial integrity (8 tests)
+- Work ViewModel (8 tests)
 - App (4 tests)
 
 ## GitHub Recovery

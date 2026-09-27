@@ -1,15 +1,22 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 5 — Budgets ✅ COMPLETE
+## Current Status: Phase 6 — Work / Income / Project Tracker ✅ COMPLETE
 
-Real local budgeting on the existing financial model:
+A local tracker for jobs, freelance work, and projects — separate from financial truth:
+- Work items: ACTIVE / PAUSED / COMPLETED / ARCHIVED
+- Expected amounts (estimates, never income) vs Received (from actual linked INCOME transactions)
+- Transaction linking: transactions.workItemId → work_items.id, ON DELETE SET NULL
+- Work list (status filter + title search) and work detail (linked transactions, link/unlink)
+- Room migration v3 → v4; all existing data preserved
+- Financial integrity regression tests (expected ≠ income; history survives deletion)
+
+Phase 5 Budgets:
 - Overall + per-category budgets (Long minor units, exact integer arithmetic)
 - Kathmandu (Asia/Kathmandu) calendar month boundaries
 - Spending derived from actual OUTFLOW transactions only
 - Status: Under budget (<50%) / Approaching limit (50–<100%) / Over budget (≥100%)
 - Create / edit / delete via dedicated Budgets screen with month navigation
 - Duplicate prevention (one overall per month, one category per category per month)
-- Room migration v2 → v3; all existing data preserved
 
 Phase 4 Transaction Intelligence:
 - 400-day analysis window with explicit boundaries
@@ -32,7 +39,7 @@ Phase 2 foundation:
 - Room database v2 (accounts, categories, transactions, goals)
 - Long minor-unit monetary representation
 - Explicit migration from Phase 1 to Phase 2
-- 141 passing unit/database/migration/dashboard/intelligence/budget tests
+- 185 passing unit/database/migration/dashboard/intelligence/budget/work tests
 
 ## Roadmap
 
@@ -44,7 +51,7 @@ Phase 2 foundation:
 | 3 | Dashboard | ✅ Complete |
 | 4 | Transaction Intelligence | ✅ Complete |
 | 5 | Budgets | ✅ Complete |
-| 6 | Work / Income / Project Tracker | ⬜ Planned |
+| 6 | Work / Income / Project Tracker | ✅ Complete |
 | 7 | Goals + Secret Target | ⬜ Planned |
 | 8 | Telecom Tracker | ⬜ Planned |
 | 9 | Opportunity Intelligence | ⬜ Planned |

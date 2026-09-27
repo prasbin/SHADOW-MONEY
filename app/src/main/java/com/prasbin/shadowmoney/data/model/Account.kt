@@ -55,12 +55,19 @@ data class Category(
             parentColumns = ["id"],
             childColumns = ["categoryId"],
             onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = WorkItem::class,
+            parentColumns = ["id"],
+            childColumns = ["workItemId"],
+            onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [
         Index("accountId"),
         Index("categoryId"),
-        Index("transactionTimestamp")
+        Index("transactionTimestamp"),
+        Index("workItemId")
     ]
 )
 data class Transaction(
@@ -68,6 +75,7 @@ data class Transaction(
     val id: Long = 0,
     val accountId: Long = 0L,
     val categoryId: Long? = null,
+    val workItemId: Long? = null,
     val amountMinor: Long = 0L,
     val direction: Int = TRANSACTION_DIRECTION_OUTFLOW,
     val transactionTimestamp: Long = System.currentTimeMillis(),

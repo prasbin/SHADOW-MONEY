@@ -301,6 +301,14 @@ class DashboardViewModelTest {
                 throw RuntimeException("Simulated database failure")
             override suspend fun getOutflowTotalForCategoryPeriod(categoryId: Long, start: Long, end: Long): Long =
                 throw RuntimeException("Simulated database failure")
+            override fun observeReceivedForWorkItem(workItemId: Long): Flow<Long> =
+                flow { throw RuntimeException("Simulated database failure") }
+            override fun observeTransactionsForWorkItem(workItemId: Long): Flow<List<Transaction>> =
+                flow { throw RuntimeException("Simulated database failure") }
+            override fun observeLinkableTransactions(workItemId: Long?): Flow<List<Transaction>> =
+                flow { throw RuntimeException("Simulated database failure") }
+            override suspend fun setWorkItemId(transactionId: Long, workItemId: Long?) =
+                throw RuntimeException("Simulated database failure")
         }
 
         val viewModel = viewModelWith(

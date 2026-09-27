@@ -136,6 +136,12 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController? = null
                 )
                 NavigationBarItem(
                     selected = false,
+                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Work.route) },
+                    icon = { Text("W") },
+                    label = { Text("Work") }
+                )
+                NavigationBarItem(
+                    selected = false,
                     onClick = { },
                     icon = { Text("$") },
                     label = { Text("Money") }

@@ -12,6 +12,7 @@ import com.prasbin.shadowmoney.presentation.screen.jobs.JobsScreen
 import com.prasbin.shadowmoney.presentation.screen.opportunities.OpportunitiesScreen
 import com.prasbin.shadowmoney.presentation.screen.settings.SettingsScreen
 import com.prasbin.shadowmoney.presentation.screen.transactions.TransactionsScreen
+import com.prasbin.shadowmoney.presentation.screen.work.WorkDetailScreen
 import com.prasbin.shadowmoney.presentation.screen.work.WorkScreen
 
 @Composable
@@ -40,7 +41,11 @@ fun ShadowMoneyNavHost(
             JobsScreen()
         }
         composable(Screen.Work.route) {
-            WorkScreen()
+            WorkScreen(navController = navController)
+        }
+        composable(Screen.WorkDetail.route) { backStackEntry ->
+            val workItemId = backStackEntry.arguments?.getString("id")?.toLongOrNull() ?: 0L
+            WorkDetailScreen(workItemId = workItemId, navController = navController)
         }
         composable(Screen.Opportunities.route) {
             OpportunitiesScreen()
@@ -69,6 +74,9 @@ object Screen {
     }
     object Work {
         const val route = "work"
+    }
+    object WorkDetail {
+        const val route = "work/{id}"
     }
     object Opportunities {
         const val route = "opportunities"

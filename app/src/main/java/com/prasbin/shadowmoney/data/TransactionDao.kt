@@ -36,6 +36,18 @@ interface TransactionDao {
     @Query("SELECT COALESCE(SUM(amountMinor), 0) FROM transactions WHERE direction = 1 AND categoryId = :categoryId AND transactionTimestamp >= :start AND transactionTimestamp < :end")
     suspend fun getOutflowTotalForCategoryPeriod(categoryId: Long, start: Long, end: Long): Long
 
+    @Query("SELECT COALESCE(SUM(amountMinor), 0) FROM transactions WHERE workItemId = :workItemId AND direction = 0")
+    fun observeReceivedForWorkItem(workItemId: Long): Flow<Long>
+
+    @Query("SELECT * FROM transactions WHERE workItemId = :workItemId ORDER BY transactionTimestamp DESC")
+    fun observeTransactionsForWorkItem(workItemId: Long): Flow<List<Transaction>>
+
+    @Query("SELECT * FROM transactions WHERE (workItemId IS NULL OR workItemId = :workItemId) ORDER BY transactionTimestamp DESC")
+    fun observeLinkableTransactions(workItemId: Long?): Flow<List<Transaction>>
+
+    @Query("UPDATE transactions SET workItemId = :workItemId WHERE id = :transactionId")
+    suspend fun setWorkItemId(transactionId: Long, workItemId: Long?)
+
     @Query("SELECT * FROM transactions WHERE id = :id")
     suspend fun getById(id: Long): Transaction?
 

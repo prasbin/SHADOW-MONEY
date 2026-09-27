@@ -33,7 +33,7 @@ import com.prasbin.shadowmoney.data.model.Category
 import com.prasbin.shadowmoney.presentation.theme.*
 import kotlinx.coroutines.flow.first
 
-private fun parseNprToMinor(input: String): Long? {
+internal fun parseNprToMinor(input: String): Long? {
     val trimmed = input.trim()
     if (trimmed.isEmpty()) return null
     val parts = trimmed.split(".")

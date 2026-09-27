@@ -9,11 +9,12 @@ import com.prasbin.shadowmoney.data.model.Budget
 import com.prasbin.shadowmoney.data.model.Category
 import com.prasbin.shadowmoney.data.model.Goal
 import com.prasbin.shadowmoney.data.model.Transaction
+import com.prasbin.shadowmoney.data.model.WorkItem
 import kotlinx.coroutines.flow.Flow
 
 @Database(
-    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class],
-    version = 3,
+    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class, WorkItem::class],
+    version = 4,
     exportSchema = true
 )
 abstract class ShadowMoneyDatabase : RoomDatabase() {
@@ -23,6 +24,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun goalDao(): GoalDao
     abstract fun budgetDao(): BudgetDao
+    abstract fun workItemDao(): WorkItemDao
 
     companion object {
         @Volatile
@@ -35,7 +37,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
                     ShadowMoneyDatabase::class.java,
                     "shadow_money_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance
@@ -118,5 +120,26 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         """.trimIndent())
         database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_budgets_categoryId_monthKey` ON `budgets` (`categoryId`, `monthKey`)")
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_budgets_monthKey` ON `budgets` (`monthKey`)")
+    }
+}
+
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `work_items` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `title` TEXT NOT NULL,
+                `description` TEXT NOT NULL,
+                `status` INTEGER NOT NULL,
+                `expectedAmountMinor` INTEGER NOT NULL,
+                `deadlineTimestamp` INTEGER NOT NULL,
+                `client` TEXT NOT NULL,
+                `createdTimestamp` INTEGER NOT NULL,
+                `updatedTimestamp` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_work_items_status` ON `work_items` (`status`)")
+        database.execSQL("ALTER TABLE `transactions` ADD COLUMN `workItemId` INTEGER DEFAULT NULL REFERENCES `work_items`(`id`) ON DELETE SET NULL")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_workItemId` ON `transactions` (`workItemId`)")
     }
 }

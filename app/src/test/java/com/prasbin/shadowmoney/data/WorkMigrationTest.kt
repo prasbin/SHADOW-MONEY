@@ -2,12 +2,13 @@ package com.prasbin.shadowmoney.data
 
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
-import com.prasbin.shadowmoney.data.model.ACCOUNT_TYPE_WALLET
-import com.prasbin.shadowmoney.data.model.Account
-import com.prasbin.shadowmoney.data.model.CATEGORY_DIRECTION_OUTFLOW
+import com.prasbin.shadowmoney.data.model.Budget
 import com.prasbin.shadowmoney.data.model.Category
+import com.prasbin.shadowmoney.data.model.Goal
 import com.prasbin.shadowmoney.data.model.TRANSACTION_DIRECTION_OUTFLOW
 import com.prasbin.shadowmoney.data.model.Transaction
+import com.prasbin.shadowmoney.data.model.WORK_STATUS_ACTIVE
+import com.prasbin.shadowmoney.data.model.WorkItem
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -19,14 +20,14 @@ import org.junit.runner.RunWith
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
-class BudgetMigrationTest {
+class WorkMigrationTest {
 
-    private val dbName = "migration-v2-to-v3-budgets.db"
+    private val dbName = "migration-v3-to-v4-work.db"
 
     private fun appContext() =
         Robolectric.buildActivity(android.app.Activity::class.java).create().get().applicationContext
 
-    private fun createPhase2V2Database(ctx: android.content.Context) {
+    private fun createPhase5V3Database(ctx: android.content.Context) {
         ctx.deleteDatabase(dbName)
         val file = ctx.getDatabasePath(dbName)
         file.parentFile?.mkdirs()
@@ -80,23 +81,38 @@ class BudgetMigrationTest {
                 FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
             )
         """.trimIndent())
+        sqlite.execSQL("""
+            CREATE TABLE IF NOT EXISTS `budgets` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `amountMinor` INTEGER NOT NULL,
+                `monthKey` TEXT NOT NULL,
+                `categoryId` INTEGER,
+                `createdTimestamp` INTEGER NOT NULL,
+                `updatedTimestamp` INTEGER NOT NULL,
+                FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+        """.trimIndent())
+        sqlite.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_budgets_categoryId_monthKey` ON `budgets` (`categoryId`, `monthKey`)")
+        sqlite.execSQL("CREATE INDEX IF NOT EXISTS `index_budgets_monthKey` ON `budgets` (`monthKey`)")
         sqlite.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_accountId` ON `transactions` (`accountId`)")
         sqlite.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_categoryId` ON `transactions` (`categoryId`)")
         sqlite.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_transactionTimestamp` ON `transactions` (`transactionTimestamp`)")
         sqlite.execSQL("CREATE INDEX IF NOT EXISTS `index_goals_accountId` ON `goals` (`accountId`)")
 
         sqlite.execSQL("INSERT INTO accounts (name, type, openingBalanceMinor, isActive, createdTimestamp) VALUES ('Wallet', 0, 100000, 1, 1700000000000)")
-        sqlite.execSQL("INSERT INTO accounts (name, type, openingBalanceMinor, isActive, createdTimestamp) VALUES ('Bank', 1, 200000, 1, 1700000000000)")
         sqlite.execSQL("INSERT INTO categories (name, direction, isActive, isSystem, createdTimestamp) VALUES ('Food', 1, 1, 1, 1700000000000)")
         sqlite.execSQL("INSERT INTO transactions (accountId, categoryId, amountMinor, direction, transactionTimestamp, note, createdTimestamp, source) VALUES (1, 1, 5000, 1, 1700000000000, 'Lunch', 1700000000000, 'manual')")
-        sqlite.version = 2
+        sqlite.execSQL("INSERT INTO transactions (accountId, categoryId, amountMinor, direction, transactionTimestamp, note, createdTimestamp, source) VALUES (1, 1, 9999, 0, 1700000000000, 'Salary', 1700000000000, 'manual')")
+        sqlite.execSQL("INSERT INTO goals (name, targetAmountMinor, accountId, deadlineTimestamp, isActive, isCompleted, createdTimestamp, updatedTimestamp) VALUES ('Save', 500000, 1, 1800000000000, 1, 0, 1700000000000, 1700000000000)")
+        sqlite.execSQL("INSERT INTO budgets (amountMinor, monthKey, categoryId, createdTimestamp, updatedTimestamp) VALUES (50000, '2026-09', 1, 1700000000000, 1700000000000)")
+        sqlite.version = 3
         sqlite.close()
     }
 
     @Test
-    fun migration2To3_createsBudgetsTableAndPreservesData() {
+    fun migration3To4_createsWorkItemsAndPreservesAllData() {
         val ctx = appContext()
-        createPhase2V2Database(ctx)
+        createPhase5V3Database(ctx)
 
         val database = Room.databaseBuilder(ctx, ShadowMoneyDatabase::class.java, dbName)
             .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
@@ -104,57 +120,25 @@ class BudgetMigrationTest {
             .build()
         try {
             runBlocking {
-                assertEquals(2, database.accountDao().getAll().first().size)
+                assertEquals(1, database.accountDao().getAll().first().size)
                 assertEquals(1, database.categoryDao().getAll().first().size)
-                assertEquals(1, database.transactionDao().getAll().first().size)
+                val transactions = database.transactionDao().getAll().first()
+                assertEquals(2, transactions.size)
+                assertEquals(5_000L, transactions.first { it.note == "Lunch" }.amountMinor)
+                assertEquals(9_999L, transactions.first { it.note == "Salary" }.amountMinor)
+                assertEquals(1, database.goalDao().getAllActive().first().size)
+                assertEquals(1, database.budgetDao().getByMonthOnce("2026-09").size)
 
-                val categoryId = database.categoryDao().insert(
-                    Category(name = "Travel", direction = CATEGORY_DIRECTION_OUTFLOW)
+                val workId = database.workItemDao().insert(
+                    WorkItem(title = "Project", expectedAmountMinor = 100_000L, status = WORK_STATUS_ACTIVE)
                 )
-                val budgetId = database.budgetDao().insert(
-                    com.prasbin.shadowmoney.data.model.Budget(
-                        amountMinor = 30_000L,
-                        monthKey = "2026-09",
-                        categoryId = categoryId
-                    )
-                )
-                assertTrue(budgetId > 0)
+                assertTrue(workId > 0)
 
-                val overallId = database.budgetDao().insert(
-                    com.prasbin.shadowmoney.data.model.Budget(
-                        amountMinor = 100_000L,
-                        monthKey = "2026-09",
-                        categoryId = null
-                    )
-                )
-                assertTrue(overallId > 0)
+                val salary = transactions.first { it.note == "Salary" }
+                database.transactionDao().setWorkItemId(salary.id, workId)
 
-                assertThrows(android.database.sqlite.SQLiteConstraintException::class.java) {
-                    runBlocking {
-                        database.budgetDao().insert(
-                            com.prasbin.shadowmoney.data.model.Budget(
-                                amountMinor = 40_000L,
-                                monthKey = "2026-09",
-                                categoryId = categoryId
-                            )
-                        )
-                    }
-                }
-
-                assertThrows(android.database.sqlite.SQLiteConstraintException::class.java) {
-                    runBlocking {
-                        database.budgetDao().insert(
-                            com.prasbin.shadowmoney.data.model.Budget(
-                                amountMinor = 40_000L,
-                                monthKey = "2026-10",
-                                categoryId = 999L
-                            )
-                        )
-                    }
-                }
-
-                val budgets = database.budgetDao().getByMonthOnce("2026-09")
-                assertEquals(2, budgets.size)
+                val updated = database.transactionDao().getById(salary.id)!!
+                assertEquals(workId, updated.workItemId)
             }
         } finally {
             database.close()
@@ -163,9 +147,39 @@ class BudgetMigrationTest {
     }
 
     @Test
-    fun migration2To3_budgetsTableSchemaCorrect() {
+    fun migration3To4_workItemIdNullableAndFkSetNull() {
         val ctx = appContext()
-        createPhase2V2Database(ctx)
+        createPhase5V3Database(ctx)
+
+        val database = Room.databaseBuilder(ctx, ShadowMoneyDatabase::class.java, dbName)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            runBlocking {
+                val transactions = database.transactionDao().getAll().first()
+                assertTrue(transactions.all { it.workItemId == null })
+
+                val workId = database.workItemDao().insert(WorkItem(title = "W"))
+                val lunch = transactions.first { it.note == "Lunch" }
+                database.transactionDao().setWorkItemId(lunch.id, workId)
+
+                database.workItemDao().delete(database.workItemDao().getById(workId)!!)
+
+                val after = database.transactionDao().getById(lunch.id)!!
+                assertNull(after.workItemId)
+                assertEquals(5_000L, after.amountMinor)
+            }
+        } finally {
+            database.close()
+            ctx.deleteDatabase(dbName)
+        }
+    }
+
+    @Test
+    fun migration3To4_schemaCorrect() {
+        val ctx = appContext()
+        createPhase5V3Database(ctx)
 
         val database = Room.databaseBuilder(ctx, ShadowMoneyDatabase::class.java, dbName)
             .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
@@ -173,19 +187,26 @@ class BudgetMigrationTest {
             .build()
         try {
             database.openHelper.readableDatabase.query(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'",
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='work_items'",
                 emptyArray()
             ).use { cursor ->
                 assertEquals(1, cursor.count)
             }
             database.openHelper.readableDatabase.query(
-                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='budgets'",
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='work_items'",
                 emptyArray()
             ).use { cursor ->
                 val names = mutableSetOf<String>()
                 while (cursor.moveToNext()) names.add(cursor.getString(0))
-                assertTrue(names.contains("index_budgets_categoryId_monthKey"))
-                assertTrue(names.contains("index_budgets_monthKey"))
+                assertTrue(names.contains("index_work_items_status"))
+            }
+            database.openHelper.readableDatabase.query(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='transactions'",
+                emptyArray()
+            ).use { cursor ->
+                val names = mutableSetOf<String>()
+                while (cursor.moveToNext()) names.add(cursor.getString(0))
+                assertTrue(names.contains("index_transactions_workItemId"))
             }
         } finally {
             database.close()
