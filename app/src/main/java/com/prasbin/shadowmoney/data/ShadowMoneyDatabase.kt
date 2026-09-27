@@ -5,14 +5,15 @@ import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.prasbin.shadowmoney.data.model.Account
+import com.prasbin.shadowmoney.data.model.Budget
 import com.prasbin.shadowmoney.data.model.Category
 import com.prasbin.shadowmoney.data.model.Goal
 import com.prasbin.shadowmoney.data.model.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Database(
-    entities = [Account::class, Category::class, Transaction::class, Goal::class],
-    version = 2,
+    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class],
+    version = 3,
     exportSchema = true
 )
 abstract class ShadowMoneyDatabase : RoomDatabase() {
@@ -21,6 +22,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun transactionDao(): TransactionDao
     abstract fun goalDao(): GoalDao
+    abstract fun budgetDao(): BudgetDao
 
     companion object {
         @Volatile
@@ -33,7 +35,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
                     ShadowMoneyDatabase::class.java,
                     "shadow_money_database"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance
@@ -98,5 +100,23 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_categoryId` ON `transactions` (`categoryId`)")
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_transactionTimestamp` ON `transactions` (`transactionTimestamp`)")
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_goals_accountId` ON `goals` (`accountId`)")
+    }
+}
+
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `budgets` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `amountMinor` INTEGER NOT NULL,
+                `monthKey` TEXT NOT NULL,
+                `categoryId` INTEGER,
+                `createdTimestamp` INTEGER NOT NULL,
+                `updatedTimestamp` INTEGER NOT NULL,
+                FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+        """.trimIndent())
+        database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_budgets_categoryId_monthKey` ON `budgets` (`categoryId`, `monthKey`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_budgets_monthKey` ON `budgets` (`monthKey`)")
     }
 }

@@ -4,16 +4,16 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 4 — Transaction Intelligence** ✅ COMPLETE
+**Phase 5 — Budgets** ✅ COMPLETE
 
-Deterministic, offline financial intelligence on top of the Phase 2/3 records:
-- 400-day analysis window with explicit boundaries
-- Period calculations (income, outflow, net, previous-period comparison, trends)
-- Rule-based recurring-outflow detection (ANALYSIS)
-- Unusual-spending detection vs historical baseline (ANALYSIS)
-- Monthly outflow projection with stated assumptions (PROJECTION)
-- Every insight classified FACT / CALCULATION / ANALYSIS / PROJECTION
-- Intelligence section added to the Dashboard; trust label retained
+Real local budgeting on top of the existing financial model:
+- Overall monthly budget and per-category budgets (Long minor units, exact integer arithmetic)
+- Kathmandu (Asia/Kathmandu, UTC+05:45) calendar month boundaries
+- Spending derived from actual OUTFLOW transactions only (income/balances/projections excluded)
+- Deterministic status: Under budget (<50%), Approaching limit (50–<100%), Over budget (≥100%)
+- Create / edit / delete budgets via a dedicated Budgets screen with month navigation
+- Duplicate prevention: one overall budget per month, one category budget per category per month
+- Room migration v2 → v3 (budgets table, unique index, FK RESTRICT); all existing data preserved
 
 ## Application ID
 
@@ -69,7 +69,7 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 
 ## Testing Status
 
-**Phase 4 Tests: 93 tests PASSING**
+**Phase 5 Tests: 141 tests PASSING**
 - Money arithmetic (5 tests)
 - Account database (5 tests)
 - Category database (5 tests)
@@ -78,12 +78,17 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 - Migration (7 tests)
 - Delete/archive semantics (8 tests)
 - Dashboard ViewModel (10 tests)
+- Intelligence repository wiring (4 tests)
 - Period calculator (8 tests)
 - Recurring detector (9 tests)
 - Unusual detector (8 tests)
 - Projection engine (5 tests)
 - Intelligence engine (7 tests)
-- Intelligence repository wiring (4 tests)
+- Budget calendar / Kathmandu timezone (8 tests)
+- Budget math / status thresholds (11 tests)
+- Budget repository CRUD + spending (18 tests)
+- Budget v2→v3 migration (2 tests)
+- Budgets ViewModel (9 tests)
 - App (4 tests)
 
 ## GitHub Recovery

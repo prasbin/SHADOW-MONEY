@@ -62,7 +62,7 @@ private fun accountTypeLabel(type: Int): String = when (type) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(navController: androidx.navigation.NavHostController? = null) {
     val context = LocalContext.current
     val viewModel: DashboardViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -127,6 +127,12 @@ fun DashboardScreen() {
                     onClick = { },
                     icon = { Icon(Icons.Default.Home, contentDescription = null) },
                     label = { Text("Dashboard") }
+                )
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Budgets.route) },
+                    icon = { Text("B") },
+                    label = { Text("Budgets") }
                 )
                 NavigationBarItem(
                     selected = false,

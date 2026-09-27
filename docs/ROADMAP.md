@@ -1,15 +1,23 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 4 — Transaction Intelligence ✅ COMPLETE
+## Current Status: Phase 5 — Budgets ✅ COMPLETE
 
-Deterministic, offline intelligence over stored records:
+Real local budgeting on the existing financial model:
+- Overall + per-category budgets (Long minor units, exact integer arithmetic)
+- Kathmandu (Asia/Kathmandu) calendar month boundaries
+- Spending derived from actual OUTFLOW transactions only
+- Status: Under budget (<50%) / Approaching limit (50–<100%) / Over budget (≥100%)
+- Create / edit / delete via dedicated Budgets screen with month navigation
+- Duplicate prevention (one overall per month, one category per category per month)
+- Room migration v2 → v3; all existing data preserved
+
+Phase 4 Transaction Intelligence:
 - 400-day analysis window with explicit boundaries
 - Period calculations (income, outflow, net, previous-period trends)
 - Recurring-outflow detection (ANALYSIS)
 - Unusual-spending detection vs baseline (ANALYSIS)
 - Monthly outflow projection with assumptions (PROJECTION)
 - FACT / CALCULATION / ANALYSIS / PROJECTION classification on every insight
-- Intelligence section on the Dashboard; trust label retained
 
 Phase 3 Dashboard:
 - Financial summary (derived balance, income, outflow) with empty state
@@ -24,7 +32,7 @@ Phase 2 foundation:
 - Room database v2 (accounts, categories, transactions, goals)
 - Long minor-unit monetary representation
 - Explicit migration from Phase 1 to Phase 2
-- 93 passing unit/database/migration/dashboard/intelligence tests
+- 141 passing unit/database/migration/dashboard/intelligence/budget tests
 
 ## Roadmap
 
@@ -35,7 +43,7 @@ Phase 2 foundation:
 | 2 | Financial Data Model | ✅ Complete |
 | 3 | Dashboard | ✅ Complete |
 | 4 | Transaction Intelligence | ✅ Complete |
-| 5 | Budgets | ⬜ Planned |
+| 5 | Budgets | ✅ Complete |
 | 6 | Work / Income / Project Tracker | ⬜ Planned |
 | 7 | Goals + Secret Target | ⬜ Planned |
 | 8 | Telecom Tracker | ⬜ Planned |

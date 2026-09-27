@@ -289,11 +289,17 @@ class DashboardViewModelTest {
                 throw RuntimeException("Simulated database failure")
             override fun getRecent(limit: Int): Flow<List<Transaction>> =
                 flow { throw RuntimeException("Simulated database failure") }
+            override fun getTransactionsInWindow(start: Long, end: Long): Flow<List<Transaction>> =
+                flow { throw RuntimeException("Simulated database failure") }
             override fun observeTransactionCount(): Flow<Int> =
                 flow { throw RuntimeException("Simulated database failure") }
             override suspend fun getTotalIncomeMinorForActiveAccounts(): Long =
                 throw RuntimeException("Simulated database failure")
             override suspend fun getTotalOutflowMinorForActiveAccounts(): Long =
+                throw RuntimeException("Simulated database failure")
+            override suspend fun getOutflowTotalForPeriod(start: Long, end: Long): Long =
+                throw RuntimeException("Simulated database failure")
+            override suspend fun getOutflowTotalForCategoryPeriod(categoryId: Long, start: Long, end: Long): Long =
                 throw RuntimeException("Simulated database failure")
         }
 

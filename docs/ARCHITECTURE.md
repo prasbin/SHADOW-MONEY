@@ -66,6 +66,10 @@ Uses Long arithmetic (100 paisa = 1 NPR). Never Float or Double.
 
 Phase 1 v1 contained only the structural `placeholder(id, name)` table with no user financial data. `MIGRATION_1_2` drops `placeholder` (intentional structural removal, no user-data loss) and creates `accounts`, `categories`, `transactions`, `goals` with camelCase Room columns, safe FK actions (`RESTRICT`/`SET NULL`, no `CASCADE`), and indices (`index_transactions_accountId`, `index_transactions_categoryId`, `index_transactions_transactionTimestamp`, `index_goals_accountId`). Verified by genuine v1 → v2 tests in `MigrationTest` (creates a v1 file, runs the actual `MIGRATION_1_2`, reopens via Room) and `DeleteArchiveSemanticsTest`.
 
+### Migration (Phase 2 → Phase 3 / Budgets)
+
+`MIGRATION_2_3` (Room version 2 → 3) creates the `budgets` table with the unique index `index_budgets_categoryId_monthKey`, the query index `index_budgets_monthKey`, and the `RESTRICT` foreign key to `categories`. Non-destructive; all existing tables and data are preserved. Verified by `BudgetMigrationTest` (real v2 database file → actual `MIGRATION_2_3` → schema, unique-index, and FK enforcement checks plus data survival).
+
 ### Dashboard (Phase 3)
 
 The Dashboard route renders real data from the Phase 2 Room model via Room → DAO/repository → ViewModel/state → Compose UI.
@@ -100,6 +104,22 @@ Deterministic, offline intelligence computed from stored Room records. No extern
 **Classification**: every `Insight` carries `InsightKind` FACT / CALCULATION / ANALYSIS / PROJECTION. FACT = direct record facts; CALCULATION = deterministic arithmetic over records; ANALYSIS = detected patterns/statistical comparisons; PROJECTION = forward estimates with assumptions. The UI renders a colored kind badge on every insight and never presents analysis/projection as fact.
 
 **Insufficient data**: empty DB, too few transactions, or < 7 days history → `sufficientData = false`, detectors return nothing, UI shows "Insufficient data…" / "No insight found". Insights are never manufactured.
+
+### Budgets (Phase 5)
+
+Local budgeting on the existing financial model. New `budgets` table (Room v3, migration `MIGRATION_2_3`); all other tables unchanged.
+
+**Budget model** (`Budget` entity): `amountMinor` (Long), `monthKey` (`yyyy-MM`), `categoryId` (nullable — null = overall budget), `createdTimestamp`, `updatedTimestamp`. FK `categoryId → categories.id` with `ON DELETE RESTRICT` (a category with budgets cannot be deleted — budgets must be deleted first; financial history is never cascade-deleted). Unique index on (`categoryId`, `monthKey`) enforces one category budget per category per month at the database level; one overall budget per month is enforced at the repository level (SQLite unique indexes treat NULLs as distinct).
+
+**Month definition**: Asia/Kathmandu (UTC+05:45, no DST). `monthStart(monthKey)` = first instant of the month in Kathmandu; `monthEndExclusive(monthKey)` = first instant of the next month. Spending queries use `transactionTimestamp >= start AND < end`.
+
+**Spending derivation**: budget spending = `SUM(amountMinor)` of `direction = 1` (OUTFLOW) transactions within the month, via SQL aggregation (`getOutflowTotalForPeriod`, `getOutflowTotalForCategoryPeriod`, and a `GROUP BY categoryId` raw query). INCOME, opening balances, account balances, and projections are never counted. Archived accounts' historical transactions still count (budgets operate on transaction records, not account state). Uncategorized transactions count toward the overall budget only.
+
+**Status thresholds** (`BudgetStatus`): `NORMAL` when `spent × 100 < budget × 50`; `APPROACHING` when `< 100`; `OVER_BUDGET` at `≥ 100`. Zero/invalid budget (≤ 0): zero spending → NORMAL, any spending → OVER_BUDGET. `percentUsed = spent × 100 / budget` (integer division, 0 when budget ≤ 0 — never divide by zero). `remaining = budget − spent` (may be negative; not capped). Progress bars are capped at 100% for display only; real values are retained separately.
+
+**Overall vs category interaction**: shown independently; category budgets are sub-limits, not additional money; no summing of unrelated limits.
+
+**UI**: dedicated Budgets screen (navigation route `budgets`, bottom-bar entry on the Dashboard) with month stepper, overall budget panel, category budget panels, create/edit dialog (scope toggle, category dropdown, month stepper, NPR amount parsed to minor units with exact integer arithmetic), delete action, and explicit Loading / Empty / Content / Error states. Budget changes, transaction changes, and category changes all refresh the display via Room Flow → StateFlow.
 
 ### Dependencies
 

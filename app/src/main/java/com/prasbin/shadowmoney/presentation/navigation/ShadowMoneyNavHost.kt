@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.prasbin.shadowmoney.presentation.screen.budgets.BudgetsScreen
 import com.prasbin.shadowmoney.presentation.screen.dashboard.DashboardScreen
 import com.prasbin.shadowmoney.presentation.screen.dashboard.MoneyPlaceholderScreen
 import com.prasbin.shadowmoney.presentation.screen.jobs.JobsScreen
@@ -24,7 +25,10 @@ fun ShadowMoneyNavHost(
         modifier = modifier
     ) {
         composable(Screen.Dashboard.route) {
-            DashboardScreen()
+            DashboardScreen(navController = navController)
+        }
+        composable(Screen.Budgets.route) {
+            BudgetsScreen()
         }
         composable(Screen.Transactions.route) {
             TransactionsScreen()
@@ -50,6 +54,9 @@ fun ShadowMoneyNavHost(
 object Screen {
     object Dashboard {
         const val route = "dashboard"
+    }
+    object Budgets {
+        const val route = "budgets"
     }
     object Transactions {
         const val route = "transactions"
