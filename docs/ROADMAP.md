@@ -1,8 +1,16 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 8 — Telecom Tracker ✅ COMPLETE
+## Current Status: Phase 9 — Opportunity Intelligence ✅ COMPLETE
 
-A local-first telecom tracker (tracking only, never a telecom-control system):
+A practical, local-first opportunity tracking and organization system (manual tracking only — never automated job acquisition):
+- Opportunities with bounded types (Freelance / Client Work / Part Time / Remote Work / Project / Repository / Other) and explicit lifecycle statuses (New / Reviewing / Applied / In Progress / Won / Lost / Archived)
+- Expected opportunity amounts (Long minor units, nullable) — explicitly NOT income
+- Manual source/URL references with offline GitHub reference parsing (no fetching, no scraping)
+- Status/type filters + local text search; detail view with "Open reference" user action
+- Strict financial separation: opportunities never create transactions, never affect balances/income/budgets
+- No predictions, scoring, probability, ranking, or AI; deterministic factual summaries only
+
+Phase 8 Telecom Tracker:
 - SIM cards, packages/plans, subscriptions (Room v5, migration `MIGRATION_4_5`)
 - Expected monthly telecom cost via exact Long normalization
 - Upcoming renewals (60-day horizon, max 5, deterministic)
@@ -50,7 +58,7 @@ Phase 2 foundation:
 - Room database v2 (accounts, categories, transactions, goals)
 - Long minor-unit monetary representation
 - Explicit migration from Phase 1 to Phase 2
-- 266 passing unit/database/migration/dashboard/intelligence/budget/work/goal/secret-target/telecom tests
+- 309 passing unit/database/migration/dashboard/intelligence/budget/work/goal/secret-target/telecom/opportunity tests
 
 ## Roadmap
 
@@ -65,7 +73,7 @@ Phase 2 foundation:
 | 6 | Work / Income / Project Tracker | ✅ Complete |
 | 7 | Goals + Secret Target | ✅ Complete |
 | 8 | Telecom Tracker | ✅ Complete |
-| 9 | Opportunity Intelligence | ⬜ Planned |
+| 9 | Opportunity Intelligence | ✅ Complete |
 | 10 | CSV Import | ⬜ Planned |
 | 11 | Local Financial Assistant | ⬜ Planned |
 | 12 | Security / Backup / Restore | ⬜ Planned |

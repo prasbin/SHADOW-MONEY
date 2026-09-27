@@ -78,6 +78,10 @@ Phase 1 v1 contained only the structural `placeholder(id, name)` table with no u
 
 `MIGRATION_4_5` (Room version 4 → 5) creates `telecom_sims`, `telecom_packages` (with `index_telecom_packages_carrier`), and `telecom_subscriptions` (with RESTRICT foreign keys to sims/packages and indices on `simId`, `packageId`, `renewalTimestamp`). Non-destructive; all existing tables and data are preserved. Verified by `TelecomMigrationTest` (real v4 database → actual `MIGRATION_4_5` → all financial/work/goal/budget data survives, telecom tables/indices/FKs created, FK enforcement tested).
 
+### Migration (Phase 8 → Phase 9 / Opportunity Intelligence)
+
+`MIGRATION_5_6` (Room version 5 → 6) creates the `opportunities` table with indices `index_opportunities_status`, `index_opportunities_type`, `index_opportunities_deadlineTimestamp`. Non-destructive; all existing tables and data are preserved. Verified by `OpportunityMigrationTest` (real v5 database → actual `MIGRATION_5_6` → all financial/goal/budget/work/telecom data survives, opportunity table/indices created).
+
 ### Dashboard (Phase 3)
 
 The Dashboard route renders real data from the Phase 2 Room model via Room → DAO/repository → ViewModel/state → Compose UI.
@@ -175,6 +179,22 @@ A local/manual telecom tracking system. It is a tracker, never a telecom-control
 **Financial separation** (regression-tested in `TelecomFinancialSeparationTest`): creating a package or subscription never creates a transaction; expected monthly cost never changes account balance; telecom data never affects budget spending; telecom records never become income/outflow. Actual payments remain normal financial transactions entered through the financial system.
 
 **UI**: Telecom screen (route `telecom`, bottom-bar entry) with Summary panel (active SIMs, active subscriptions, expected monthly cost, next renewal, ≤5 upcoming renewals), SIMs panel (add/edit/archive/activate), Packages panel (add/edit/archive), Subscriptions panel (create/edit/deactivate/delete), and explicit Loading/Empty/Content/Error states. Kathmandu timezone for date handling. No logging of phone numbers or sensitive telecom data.
+
+### Opportunity Intelligence (Phase 9)
+
+A local-first opportunity tracking and organization system for manually tracked income opportunities (freelance jobs, client work, part-time, remote work, projects, repositories). It is for tracking/organization only — never automated job acquisition.
+
+**Model** (`Opportunity` entity, `opportunities` table, Room v6 / `MIGRATION_5_6`): `title`, `description`, `type` (bounded: Freelance / Client Work / Part Time / Remote Work / Project / Repository / Other), `source`, `sourceUrl` (plain user-entered data), `expectedAmountMinor` (Long, nullable), `status` (New / Reviewing / Applied / In Progress / Won / Lost / Archived), `deadlineTimestamp` (0 = none), `client`, timestamps; indices on `status`, `type`, `deadlineTimestamp`.
+
+**Expected vs actual**: an opportunity amount is an expected opportunity amount — NOT income. It never increases account balance, income totals, or budget figures; never creates a transaction. A `WON` status is still only an opportunity record until an actual financial transaction is separately recorded. No probability, successRate, predictedIncome, or speculative fields exist.
+
+**No predictions/scoring**: the app provides deterministic factual summaries only (active count, total stored expected amounts, needs-review count, upcoming deadlines). No ranking, "best opportunity", "most likely to pay", or AI.
+
+**URL handling**: URLs are stored as plain data and validated for basic structure (http/https, no spaces). Offline GitHub reference parsing extracts owner/repository/issue-reference from `https://github.com/owner/repo[/issues/123]` — no fetching, no scraping, no GitHub API calls. The detail view offers a user-initiated "Open reference" action (Android `ACTION_VIEW` intent); the app never fetches the URL itself.
+
+**Financial separation** (regression-tested in `OpportunityFinancialSeparationTest`): creating an opportunity creates no transaction; expected amount does not change account balance; expected amount does not count as income; expected amount does not affect budgets; status changes (including WON) create no financial records.
+
+**UI**: Opportunities screen (route `opportunities`, bottom-bar entry) with Summary panel (active count, total stored expected amount, needs-review count, ≤5 upcoming deadlines), status/type filter chips, title/client/source/notes search, opportunity cards, create/edit form dialogs, detail dialog with Open-reference action, and explicit Loading/Empty/Content/Error states. Kathmandu timezone for deadlines (No deadline / Upcoming / Due today / Overdue).
 
 ### Dependencies
 

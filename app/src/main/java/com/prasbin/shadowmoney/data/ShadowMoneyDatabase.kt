@@ -8,6 +8,7 @@ import com.prasbin.shadowmoney.data.model.Account
 import com.prasbin.shadowmoney.data.model.Budget
 import com.prasbin.shadowmoney.data.model.Category
 import com.prasbin.shadowmoney.data.model.Goal
+import com.prasbin.shadowmoney.data.model.Opportunity
 import com.prasbin.shadowmoney.data.model.TelecomPackage
 import com.prasbin.shadowmoney.data.model.TelecomSim
 import com.prasbin.shadowmoney.data.model.TelecomSubscription
@@ -16,8 +17,8 @@ import com.prasbin.shadowmoney.data.model.WorkItem
 import kotlinx.coroutines.flow.Flow
 
 @Database(
-    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class, WorkItem::class, TelecomSim::class, TelecomPackage::class, TelecomSubscription::class],
-    version = 5,
+    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class, WorkItem::class, TelecomSim::class, TelecomPackage::class, TelecomSubscription::class, Opportunity::class],
+    version = 6,
     exportSchema = true
 )
 abstract class ShadowMoneyDatabase : RoomDatabase() {
@@ -29,6 +30,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun workItemDao(): WorkItemDao
     abstract fun telecomDao(): TelecomDao
+    abstract fun opportunityDao(): OpportunityDao
 
     companion object {
         @Volatile
@@ -41,7 +43,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
                     ShadowMoneyDatabase::class.java,
                     "shadow_money_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance
@@ -195,5 +197,29 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_telecom_subscriptions_simId` ON `telecom_subscriptions` (`simId`)")
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_telecom_subscriptions_packageId` ON `telecom_subscriptions` (`packageId`)")
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_telecom_subscriptions_renewalTimestamp` ON `telecom_subscriptions` (`renewalTimestamp`)")
+    }
+}
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `opportunities` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `title` TEXT NOT NULL,
+                `description` TEXT NOT NULL,
+                `type` INTEGER NOT NULL,
+                `source` TEXT NOT NULL,
+                `sourceUrl` TEXT NOT NULL,
+                `expectedAmountMinor` INTEGER,
+                `status` INTEGER NOT NULL,
+                `deadlineTimestamp` INTEGER NOT NULL,
+                `client` TEXT NOT NULL,
+                `createdTimestamp` INTEGER NOT NULL,
+                `updatedTimestamp` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_opportunities_status` ON `opportunities` (`status`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_opportunities_type` ON `opportunities` (`type`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_opportunities_deadlineTimestamp` ON `opportunities` (`deadlineTimestamp`)")
     }
 }

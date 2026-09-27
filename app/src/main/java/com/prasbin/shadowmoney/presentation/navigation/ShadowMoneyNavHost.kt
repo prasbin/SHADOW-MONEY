@@ -39,6 +39,9 @@ fun ShadowMoneyNavHost(
         composable(Screen.Telecom.route) {
             TelecomScreen(navController = navController)
         }
+        composable(Screen.Opportunities.route) {
+            OpportunitiesScreen(navController = navController)
+        }
         composable(Screen.Transactions.route) {
             TransactionsScreen()
         }
@@ -54,9 +57,6 @@ fun ShadowMoneyNavHost(
         composable(Screen.WorkDetail.route) { backStackEntry ->
             val workItemId = backStackEntry.arguments?.getString("id")?.toLongOrNull() ?: 0L
             WorkDetailScreen(workItemId = workItemId, navController = navController)
-        }
-        composable(Screen.Opportunities.route) {
-            OpportunitiesScreen()
         }
         composable(Screen.Settings.route) {
             SettingsScreen()
@@ -77,6 +77,9 @@ object Screen {
     object Telecom {
         const val route = "telecom"
     }
+    object Opportunities {
+        const val route = "opportunities"
+    }
     object Transactions {
         const val route = "transactions"
     }
@@ -91,9 +94,6 @@ object Screen {
     }
     object WorkDetail {
         const val route = "work/{id}"
-    }
-    object Opportunities {
-        const val route = "opportunities"
     }
     object Settings {
         const val route = "settings"

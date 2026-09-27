@@ -33,7 +33,7 @@ class MigrationTest {
         database = Room.inMemoryDatabaseBuilder(
             appContext,
             ShadowMoneyDatabase::class.java
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
         .allowMainThreadQueries()
         .build()
         accountDao = database.accountDao()
@@ -50,7 +50,7 @@ class MigrationTest {
     }
 
     // ------------------------------------------------------------------
-    // Legacy fresh-DB table checks (kept ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â prove v2 schema opens cleanly).
+    // Legacy fresh-DB table checks (kept ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â prove v2 schema opens cleanly).
     // ------------------------------------------------------------------
 
     @Test
@@ -85,7 +85,7 @@ class MigrationTest {
     //               name TEXT NOT NULL)
     // with NO user financial data. MIGRATION_1_2 intentionally drops that
     // structural placeholder and creates the four v2 financial tables.
-    // This test exercises the ACTUAL MIGRATION_1_2 object ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â it does NOT
+    // This test exercises the ACTUAL MIGRATION_1_2 object ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â it does NOT
     // merely create a fresh v2 database.
     // ------------------------------------------------------------------
 
@@ -179,7 +179,7 @@ class MigrationTest {
 
         // 3. Run the ACTUAL MIGRATION_1_2 by opening the v1 file with Room v2.
         val migrated = Room.databaseBuilder(ctx, ShadowMoneyDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .allowMainThreadQueries()
             .build()
         try {
@@ -231,7 +231,7 @@ class MigrationTest {
                 "transactions must reference categories",
                 txFks.any { it.first == "categoryId" && it.second == "categories" }
             )
-            // Account FK must NOT be CASCADE ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â financial history must survive.
+            // Account FK must NOT be CASCADE ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â financial history must survive.
             val accountFk = txFks.first { it.first == "accountId" }
             assertNotEquals(
                 "transactions.accountId must not CASCADE (would erase history)",
@@ -265,7 +265,7 @@ class MigrationTest {
 
         // 6. Open the migrated database through the Room configuration.
         val migrated = Room.databaseBuilder(ctx, ShadowMoneyDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .allowMainThreadQueries()
             .build()
         try {
@@ -301,7 +301,7 @@ class MigrationTest {
     fun realMigration_doesNotCorruptV1Data_placeholderHadNoUserData() {
         // 7. Phase 1 v1 contained ONLY the structural placeholder table.
         // There was no user financial data to preserve, so dropping the
-        // placeholder is intentional and documented ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â not silent data loss.
+        // placeholder is intentional and documented ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â not silent data loss.
         val ctx = appContext()
         val dbName = "migration-v1-to-v2-nodata.db"
         val file = createPhase1V1Database(dbName)
@@ -314,11 +314,11 @@ class MigrationTest {
         pre.close()
 
         val migrated = Room.databaseBuilder(ctx, ShadowMoneyDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .allowMainThreadQueries()
             .build()
         try {
-            // v2 tables start empty and usable ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â no corruption, no phantom rows.
+            // v2 tables start empty and usable ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â no corruption, no phantom rows.
             runBlocking {
                 assertTrue(migrated.accountDao().getAll().first().isEmpty())
                 assertTrue(migrated.categoryDao().getAll().first().isEmpty())

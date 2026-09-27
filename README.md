@@ -4,15 +4,15 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 8 — Telecom Tracker** ✅ COMPLETE
+**Phase 9 — Opportunity Intelligence** ✅ COMPLETE
 
-A practical local-first telecom tracker (tracking only — never a telecom-control system):
-- SIM cards, packages/plans, and subscriptions (Room v5, migration `MIGRATION_4_5`)
-- Expected monthly telecom cost via exact Long normalization (weekly ×52÷12, quarterly ÷3, yearly ÷12)
-- Upcoming renewals (60-day horizon, max 5, deterministic ordering)
-- Summary: active SIMs, active subscriptions, expected monthly cost, next renewal
-- Strict financial separation: telecom data never creates transactions or alters financial truth
-- No device/SIM access, no carrier APIs, no SMS/phone permissions — all data manually entered
+A practical, local-first opportunity tracking and organization system (manual tracking only — never automated job acquisition):
+- Opportunities with bounded types (Freelance / Client Work / Part Time / Remote Work / Project / Repository / Other) and explicit lifecycle statuses (New / Reviewing / Applied / In Progress / Won / Lost / Archived)
+- Expected opportunity amounts (Long minor units, nullable) — explicitly NOT income
+- Manual source/URL references with offline GitHub reference parsing (no fetching, no scraping)
+- Status/type filters + local text search; detail view with "Open reference" user action
+- Strict financial separation: opportunities never create transactions, never affect balances/income/budgets
+- No predictions, scoring, probability, ranking, or AI; deterministic factual summaries only
 
 ## Application ID
 
@@ -68,7 +68,7 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 
 ## Testing Status
 
-**Phase 8 Tests: 266 tests PASSING**
+**Phase 9 Tests: 309 tests PASSING**
 - Money arithmetic (5 tests)
 - Account database (5 tests)
 - Category database (5 tests)
@@ -102,6 +102,11 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 - Telecom repository CRUD + summary (18 tests)
 - Telecom v4→v5 migration (3 tests)
 - Telecom financial separation (7 tests)
+- Opportunity math / deadlines / URL parsing (11 tests)
+- Opportunity repository CRUD + filters + search (15 tests)
+- Opportunity v5→v6 migration (2 tests)
+- Opportunity financial separation (7 tests)
+- Opportunities ViewModel (8 tests)
 - App (4 tests)
 
 ## GitHub Recovery
