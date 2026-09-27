@@ -4,16 +4,10 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 6 — Work / Income / Project Tracker** ✅ COMPLETE
+**Phase 7 — Goals + Secret Target** ✅ COMPLETE
 
-A practical local tracker for jobs, freelance work, and projects — kept strictly separate from financial truth:
-- Work items with ACTIVE / PAUSED / COMPLETED / ARCHIVED statuses
-- Expected amounts (estimates — never income) vs Received amounts (derived from actual linked INCOME transactions)
-- Optional transaction linking (`transactions.workItemId → work_items.id`, `ON DELETE SET NULL`)
-- Work list with status filter + title search; work detail with linked transactions and link/unlink actions
-- Dedicated Work screen + detail screen in the existing navigation
-- Room migration v3 → v4 (`work_items` table + nullable `workItemId`); all existing data preserved
-- Financial integrity regression tests: expected amounts never affect balance, income, or budgets
+- **Goals**: dedicated Goals screen (list / create / edit / archive / delete) reusing the Phase 2 `goals` table; progress derived from the linked account's authoritative balance; explicit states.
+- **Secret Target**: private personal target stored in app-private DataStore (Long minor units), masked by default with explicit reveal, updatable at any time (no monthly lock), excluded from Dashboard, goals, budgets, work, intelligence, logs, and backups.
 
 ## Application ID
 
@@ -69,7 +63,7 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 
 ## Testing Status
 
-**Phase 6 Tests: 185 tests PASSING**
+**Phase 7 Tests: 219 tests PASSING**
 - Money arithmetic (5 tests)
 - Account database (5 tests)
 - Category database (5 tests)
@@ -94,6 +88,10 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 - Work v3→v4 migration (3 tests)
 - Financial integrity (8 tests)
 - Work ViewModel (8 tests)
+- Goal repository CRUD + progress (11 tests)
+- Goals ViewModel (7 tests)
+- Secret Target store (9 tests)
+- Secret Target privacy boundary (7 tests)
 - App (4 tests)
 
 ## GitHub Recovery

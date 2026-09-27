@@ -9,6 +9,9 @@ interface GoalDao {
     @Query("SELECT * FROM goals WHERE isActive = 1 ORDER BY name ASC")
     fun getAllActive(): Flow<List<Goal>>
 
+    @Query("SELECT * FROM goals ORDER BY isActive DESC, name ASC")
+    fun observeAll(): Flow<List<Goal>>
+
     @Query("SELECT * FROM goals WHERE id = :id")
     suspend fun getById(id: Long): Goal?
 

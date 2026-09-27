@@ -143,6 +143,18 @@ A local tracker for jobs, freelance work, and projects. **The tracker is separat
 
 **Financial integrity** (regression-tested in `FinancialIntegrityTest`): expected amounts do not change account balance, income totals, or budget figures; linked actual income remains normal financial income; linked outflow remains budget spending; deleting/archiving a work item never deletes or alters transactions.
 
+### Goals + Secret Target (Phase 7)
+
+**Ordinary goals** reuse the Phase 2 `goals` table (no duplicate goal store). `GoalRepository` (extended) provides CRUD with validation (name required, target > 0) and `loadGoalViews`: progress = linked account's authoritative derived balance (`opening + income − outflow` via `Money.balanceMinor`), `remaining = target − balance`, `percent = balance × 100 / target` (0 when target ≤ 0). Progress > 100% is truthful (bar capped visually only). Account relationship: Phase 2 FK `SET NULL` — account deletion nulls the goal's `accountId` and the UI shows "No account linked"; archived accounts still derive progress from their records. Goals screen (route `goals`, bottom-bar entry) with list/create/edit/archive/delete, form dialog (name, target, optional account, optional deadline), and explicit Loading/Empty/Content/Error states. Dashboard goal section unchanged and reactive (same DAO/flows).
+
+**Secret Target** is a private personal target, NOT an ordinary goal:
+- **Storage**: app-private DataStore Preferences (`secret_target_preferences`), single Long key `secret_target_minor` (exact minor units, never Float/Double). No Room table — the value never enters the database.
+- **Privacy boundary**: excluded from Dashboard totals, ordinary goal lists, transactions, budgets, work tracker, intelligence engine, logs, analytics, and network. The store contains no logging; the value never enters shared repository state.
+- **UI**: private section on the Goals screen — masked by default (`••••••••`), explicit reveal toggle, edit dialog, clear with confirmation. Wording makes the private nature clear.
+- **Update rule**: the user may update the Secret Target at any time — no monthly-change lock.
+- **Encryption status**: NOT encrypted. Stored in app-private DataStore (sandboxed app storage, `MODE_PRIVATE` semantics). No Keystore/AES-GCM is implemented in this phase; the exact limitation is that the value is protected only by Android app sandboxing, not by encryption at rest.
+- **Backup/export exclusion**: the Secret Target lives outside Room, so any future DB backup/SAF export cannot include it by construction. No backup functionality is implemented in this phase.
+
 ### Dependencies
 
 Same versions as SHADOW LEARN project for consistency:

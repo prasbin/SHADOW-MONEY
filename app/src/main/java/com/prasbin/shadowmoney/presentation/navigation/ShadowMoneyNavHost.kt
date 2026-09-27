@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import com.prasbin.shadowmoney.presentation.screen.budgets.BudgetsScreen
 import com.prasbin.shadowmoney.presentation.screen.dashboard.DashboardScreen
 import com.prasbin.shadowmoney.presentation.screen.dashboard.MoneyPlaceholderScreen
+import com.prasbin.shadowmoney.presentation.screen.goals.GoalsScreen
 import com.prasbin.shadowmoney.presentation.screen.jobs.JobsScreen
 import com.prasbin.shadowmoney.presentation.screen.opportunities.OpportunitiesScreen
 import com.prasbin.shadowmoney.presentation.screen.settings.SettingsScreen
@@ -30,6 +31,9 @@ fun ShadowMoneyNavHost(
         }
         composable(Screen.Budgets.route) {
             BudgetsScreen()
+        }
+        composable(Screen.Goals.route) {
+            GoalsScreen(navController = navController)
         }
         composable(Screen.Transactions.route) {
             TransactionsScreen()
@@ -62,6 +66,9 @@ object Screen {
     }
     object Budgets {
         const val route = "budgets"
+    }
+    object Goals {
+        const val route = "goals"
     }
     object Transactions {
         const val route = "transactions"

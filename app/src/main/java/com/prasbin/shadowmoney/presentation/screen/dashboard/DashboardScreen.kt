@@ -130,6 +130,12 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController? = null
                 )
                 NavigationBarItem(
                     selected = false,
+                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Goals.route) },
+                    icon = { Text("G") },
+                    label = { Text("Goals") }
+                )
+                NavigationBarItem(
+                    selected = false,
                     onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Budgets.route) },
                     icon = { Text("B") },
                     label = { Text("Budgets") }
