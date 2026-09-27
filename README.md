@@ -4,10 +4,15 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 7 — Goals + Secret Target** ✅ COMPLETE
+**Phase 8 — Telecom Tracker** ✅ COMPLETE
 
-- **Goals**: dedicated Goals screen (list / create / edit / archive / delete) reusing the Phase 2 `goals` table; progress derived from the linked account's authoritative balance; explicit states.
-- **Secret Target**: private personal target stored in app-private DataStore (Long minor units), masked by default with explicit reveal, updatable at any time (no monthly lock), excluded from Dashboard, goals, budgets, work, intelligence, logs, and backups.
+A practical local-first telecom tracker (tracking only — never a telecom-control system):
+- SIM cards, packages/plans, and subscriptions (Room v5, migration `MIGRATION_4_5`)
+- Expected monthly telecom cost via exact Long normalization (weekly ×52÷12, quarterly ÷3, yearly ÷12)
+- Upcoming renewals (60-day horizon, max 5, deterministic ordering)
+- Summary: active SIMs, active subscriptions, expected monthly cost, next renewal
+- Strict financial separation: telecom data never creates transactions or alters financial truth
+- No device/SIM access, no carrier APIs, no SMS/phone permissions — all data manually entered
 
 ## Application ID
 
@@ -63,7 +68,7 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 
 ## Testing Status
 
-**Phase 7 Tests: 219 tests PASSING**
+**Phase 8 Tests: 266 tests PASSING**
 - Money arithmetic (5 tests)
 - Account database (5 tests)
 - Category database (5 tests)
@@ -92,6 +97,11 @@ Phase 1 v1 contained only the structural `placeholder` table (no user financial 
 - Goals ViewModel (7 tests)
 - Secret Target store (9 tests)
 - Secret Target privacy boundary (7 tests)
+- Telecom math (10 tests)
+- Telecom renewals (9 tests)
+- Telecom repository CRUD + summary (18 tests)
+- Telecom v4→v5 migration (3 tests)
+- Telecom financial separation (7 tests)
 - App (4 tests)
 
 ## GitHub Recovery

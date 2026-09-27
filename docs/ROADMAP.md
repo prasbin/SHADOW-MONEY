@@ -1,9 +1,18 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 7 — Goals + Secret Target ✅ COMPLETE
+## Current Status: Phase 8 — Telecom Tracker ✅ COMPLETE
 
-- **Goals**: dedicated Goals screen (list / create / edit / archive / delete) reusing the Phase 2 `goals` table; progress derived from the linked account's authoritative balance.
-- **Secret Target**: private personal target in app-private DataStore (Long minor units), masked by default with explicit reveal, updatable at any time (no monthly lock), excluded from Dashboard/goals/budgets/work/intelligence/logs/backups. Not encrypted (app-sandbox only) — limitation documented.
+A local-first telecom tracker (tracking only, never a telecom-control system):
+- SIM cards, packages/plans, subscriptions (Room v5, migration `MIGRATION_4_5`)
+- Expected monthly telecom cost via exact Long normalization
+- Upcoming renewals (60-day horizon, max 5, deterministic)
+- Summary: active SIMs, active subscriptions, expected monthly cost, next renewal
+- Strict financial separation: telecom data never creates transactions or alters financial truth
+- No device/SIM access, no carrier APIs, no SMS/phone permissions — all data manually entered
+
+Phase 7 Goals + Secret Target:
+- Dedicated Goals screen (list / create / edit / archive / delete) reusing the Phase 2 `goals` table; progress derived from the linked account's authoritative balance
+- Secret Target: private personal target in app-private DataStore (Long minor units), masked by default with explicit reveal, updatable at any time (no monthly lock), excluded from Dashboard/goals/budgets/work/intelligence/logs/backups. Not encrypted (app-sandbox only) — limitation documented.
 
 Phase 6 Work / Income / Project Tracker:
 - Work items: ACTIVE / PAUSED / COMPLETED / ARCHIVED
@@ -41,7 +50,7 @@ Phase 2 foundation:
 - Room database v2 (accounts, categories, transactions, goals)
 - Long minor-unit monetary representation
 - Explicit migration from Phase 1 to Phase 2
-- 219 passing unit/database/migration/dashboard/intelligence/budget/work/goal/secret-target tests
+- 266 passing unit/database/migration/dashboard/intelligence/budget/work/goal/secret-target/telecom tests
 
 ## Roadmap
 
@@ -55,7 +64,7 @@ Phase 2 foundation:
 | 5 | Budgets | ✅ Complete |
 | 6 | Work / Income / Project Tracker | ✅ Complete |
 | 7 | Goals + Secret Target | ✅ Complete |
-| 8 | Telecom Tracker | ⬜ Planned |
+| 8 | Telecom Tracker | ✅ Complete |
 | 9 | Opportunity Intelligence | ⬜ Planned |
 | 10 | CSV Import | ⬜ Planned |
 | 11 | Local Financial Assistant | ⬜ Planned |

@@ -8,13 +8,16 @@ import com.prasbin.shadowmoney.data.model.Account
 import com.prasbin.shadowmoney.data.model.Budget
 import com.prasbin.shadowmoney.data.model.Category
 import com.prasbin.shadowmoney.data.model.Goal
+import com.prasbin.shadowmoney.data.model.TelecomPackage
+import com.prasbin.shadowmoney.data.model.TelecomSim
+import com.prasbin.shadowmoney.data.model.TelecomSubscription
 import com.prasbin.shadowmoney.data.model.Transaction
 import com.prasbin.shadowmoney.data.model.WorkItem
 import kotlinx.coroutines.flow.Flow
 
 @Database(
-    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class, WorkItem::class],
-    version = 4,
+    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class, WorkItem::class, TelecomSim::class, TelecomPackage::class, TelecomSubscription::class],
+    version = 5,
     exportSchema = true
 )
 abstract class ShadowMoneyDatabase : RoomDatabase() {
@@ -25,6 +28,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
     abstract fun goalDao(): GoalDao
     abstract fun budgetDao(): BudgetDao
     abstract fun workItemDao(): WorkItemDao
+    abstract fun telecomDao(): TelecomDao
 
     companion object {
         @Volatile
@@ -37,7 +41,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
                     ShadowMoneyDatabase::class.java,
                     "shadow_money_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                 INSTANCE = instance
                 instance
@@ -141,5 +145,55 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_work_items_status` ON `work_items` (`status`)")
         database.execSQL("ALTER TABLE `transactions` ADD COLUMN `workItemId` INTEGER DEFAULT NULL REFERENCES `work_items`(`id`) ON DELETE SET NULL")
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_workItemId` ON `transactions` (`workItemId`)")
+    }
+}
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `telecom_sims` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `label` TEXT NOT NULL,
+                `carrier` TEXT NOT NULL,
+                `phoneNumber` TEXT NOT NULL,
+                `status` INTEGER NOT NULL,
+                `notes` TEXT NOT NULL,
+                `createdTimestamp` INTEGER NOT NULL,
+                `updatedTimestamp` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `telecom_packages` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `name` TEXT NOT NULL,
+                `carrier` TEXT NOT NULL,
+                `category` TEXT NOT NULL,
+                `priceMinor` INTEGER NOT NULL,
+                `period` INTEGER NOT NULL,
+                `notes` TEXT NOT NULL,
+                `isActive` INTEGER NOT NULL,
+                `createdTimestamp` INTEGER NOT NULL,
+                `updatedTimestamp` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_telecom_packages_carrier` ON `telecom_packages` (`carrier`)")
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `telecom_subscriptions` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `simId` INTEGER NOT NULL,
+                `packageId` INTEGER NOT NULL,
+                `startTimestamp` INTEGER NOT NULL,
+                `renewalTimestamp` INTEGER NOT NULL,
+                `monthlyCostMinor` INTEGER NOT NULL,
+                `isActive` INTEGER NOT NULL,
+                `createdTimestamp` INTEGER NOT NULL,
+                `updatedTimestamp` INTEGER NOT NULL,
+                FOREIGN KEY(`simId`) REFERENCES `telecom_sims`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                FOREIGN KEY(`packageId`) REFERENCES `telecom_packages`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+            )
+        """.trimIndent())
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_telecom_subscriptions_simId` ON `telecom_subscriptions` (`simId`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_telecom_subscriptions_packageId` ON `telecom_subscriptions` (`packageId`)")
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_telecom_subscriptions_renewalTimestamp` ON `telecom_subscriptions` (`renewalTimestamp`)")
     }
 }

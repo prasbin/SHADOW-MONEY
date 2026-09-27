@@ -12,6 +12,7 @@ import com.prasbin.shadowmoney.presentation.screen.goals.GoalsScreen
 import com.prasbin.shadowmoney.presentation.screen.jobs.JobsScreen
 import com.prasbin.shadowmoney.presentation.screen.opportunities.OpportunitiesScreen
 import com.prasbin.shadowmoney.presentation.screen.settings.SettingsScreen
+import com.prasbin.shadowmoney.presentation.screen.telecom.TelecomScreen
 import com.prasbin.shadowmoney.presentation.screen.transactions.TransactionsScreen
 import com.prasbin.shadowmoney.presentation.screen.work.WorkDetailScreen
 import com.prasbin.shadowmoney.presentation.screen.work.WorkScreen
@@ -34,6 +35,9 @@ fun ShadowMoneyNavHost(
         }
         composable(Screen.Goals.route) {
             GoalsScreen(navController = navController)
+        }
+        composable(Screen.Telecom.route) {
+            TelecomScreen(navController = navController)
         }
         composable(Screen.Transactions.route) {
             TransactionsScreen()
@@ -69,6 +73,9 @@ object Screen {
     }
     object Goals {
         const val route = "goals"
+    }
+    object Telecom {
+        const val route = "telecom"
     }
     object Transactions {
         const val route = "transactions"

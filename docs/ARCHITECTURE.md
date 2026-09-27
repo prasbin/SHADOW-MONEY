@@ -74,6 +74,10 @@ Phase 1 v1 contained only the structural `placeholder(id, name)` table with no u
 
 `MIGRATION_3_4` (Room version 3 → 4) creates the `work_items` table with `index_work_items_status`, adds the nullable `workItemId` column to `transactions` (`INTEGER DEFAULT NULL REFERENCES work_items(id) ON DELETE SET NULL`), and creates `index_transactions_workItemId`. Non-destructive; all existing tables (accounts, categories, transactions, goals, budgets) and data are preserved. Verified by `WorkMigrationTest` (real v3 database → actual `MIGRATION_3_4` → all tables/data survive, transaction values unchanged, `workItemId` nullable, linked transaction survives work-item deletion with SET NULL).
 
+### Migration (Phase 7 → Phase 8 / Telecom Tracker)
+
+`MIGRATION_4_5` (Room version 4 → 5) creates `telecom_sims`, `telecom_packages` (with `index_telecom_packages_carrier`), and `telecom_subscriptions` (with RESTRICT foreign keys to sims/packages and indices on `simId`, `packageId`, `renewalTimestamp`). Non-destructive; all existing tables and data are preserved. Verified by `TelecomMigrationTest` (real v4 database → actual `MIGRATION_4_5` → all financial/work/goal/budget data survives, telecom tables/indices/FKs created, FK enforcement tested).
+
 ### Dashboard (Phase 3)
 
 The Dashboard route renders real data from the Phase 2 Room model via Room → DAO/repository → ViewModel/state → Compose UI.
@@ -154,6 +158,23 @@ A local tracker for jobs, freelance work, and projects. **The tracker is separat
 - **Update rule**: the user may update the Secret Target at any time — no monthly-change lock.
 - **Encryption status**: NOT encrypted. Stored in app-private DataStore (sandboxed app storage, `MODE_PRIVATE` semantics). No Keystore/AES-GCM is implemented in this phase; the exact limitation is that the value is protected only by Android app sandboxing, not by encryption at rest.
 - **Backup/export exclusion**: the Secret Target lives outside Room, so any future DB backup/SAF export cannot include it by construction. No backup functionality is implemented in this phase.
+
+### Telecom Tracker (Phase 8)
+
+A local/manual telecom tracking system. It is a tracker, never a telecom-control system: no device/SIM access, no carrier APIs, no SMS/phone permissions, no automatic carrier actions. All data is user-entered.
+
+**Model** (new tables in Room v5, migration `MIGRATION_4_5`):
+- `telecom_sims`: label, carrier, phoneNumber (user-entered, optional — never auto-read), status (ACTIVE/ARCHIVED), notes, timestamps.
+- `telecom_packages`: name, carrier, category, `priceMinor` (Long), `period` (weekly/monthly/quarterly/yearly), notes, `isActive`, timestamps; index on `carrier`.
+- `telecom_subscriptions`: `simId` FK → sims (RESTRICT), `packageId` FK → packages (RESTRICT), `startTimestamp`, `renewalTimestamp`, optional custom `monthlyCostMinor`, `isActive`, timestamps; indices on `simId`, `packageId`, `renewalTimestamp`. RESTRICT protects subscriptions — a SIM/package with subscriptions cannot be deleted (archive it instead); no financial history is ever cascade-deleted.
+
+**TelecomMath** (pure Kotlin, exact Long arithmetic): expected monthly cost normalization — weekly `price × 52 ÷ 12`, monthly as-is, quarterly `÷ 3`, yearly `÷ 12`; non-positive price or unknown period → 0; division truncates toward zero. Labeled "expected monthly telecom cost" — never a carrier bill. Subscription cost = custom `monthlyCostMinor` if set, else derived from its package.
+
+**Renewals**: active subscriptions with `renewalTimestamp` in the next 60 days (bounded horizon), sorted by renewal date, capped at 5 displayed items. Uses stored renewal dates only; no fake renewals, no carrier prediction.
+
+**Financial separation** (regression-tested in `TelecomFinancialSeparationTest`): creating a package or subscription never creates a transaction; expected monthly cost never changes account balance; telecom data never affects budget spending; telecom records never become income/outflow. Actual payments remain normal financial transactions entered through the financial system.
+
+**UI**: Telecom screen (route `telecom`, bottom-bar entry) with Summary panel (active SIMs, active subscriptions, expected monthly cost, next renewal, ≤5 upcoming renewals), SIMs panel (add/edit/archive/activate), Packages panel (add/edit/archive), Subscriptions panel (create/edit/deactivate/delete), and explicit Loading/Empty/Content/Error states. Kathmandu timezone for date handling. No logging of phone numbers or sensitive telecom data.
 
 ### Dependencies
 

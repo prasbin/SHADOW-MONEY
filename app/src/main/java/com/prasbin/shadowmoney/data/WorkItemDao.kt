@@ -17,6 +17,9 @@ interface WorkItemDao {
     """)
     fun observeWorkItems(statusFilter: Int?, search: String?): Flow<List<WorkItem>>
 
+    @Query("SELECT * FROM work_items ORDER BY createdTimestamp DESC")
+    fun observeAll(): Flow<List<WorkItem>>
+
     @Query("SELECT * FROM work_items WHERE id = :id")
     fun observeById(id: Long): Flow<WorkItem?>
 
