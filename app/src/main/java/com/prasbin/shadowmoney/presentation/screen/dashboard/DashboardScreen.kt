@@ -115,6 +115,17 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController? = null
                         )
                     }
                 },
+                actions = {
+                    TextButton(
+                        onClick = {
+                            navController?.navigate(
+                                com.prasbin.shadowmoney.presentation.navigation.Screen.Assistant.route
+                            )
+                        }
+                    ) {
+                        Text("Ask", color = NeonCyan)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = DarkSurface
                 )

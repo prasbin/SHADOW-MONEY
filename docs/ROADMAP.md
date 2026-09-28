@@ -1,6 +1,18 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 10 — Legitimate Financial Import ✅ COMPLETE
+## Current Status: Phase 11 — Local Financial Assistant ✅ COMPLETE
+
+A deterministic, offline, read-only assistant for bounded questions about recorded financial data (not a general-purpose AI assistant):
+- Bounded intents (A–K): balance, income, outflow, budget, goals, work, telecom, opportunities, transactions, import, help — plus SECRET_TARGET_REFUSAL / AMBIGUOUS / CLARIFY_PERIOD / UNSUPPORTED for anything outside the set; never guesses
+- Deterministic keyword/phrase classification — no model, no randomness, no network; ambiguous ties answered with an honest "which one do you mean?"
+- Periods today / yesterday / this week / last week / this month / last month / recent computed in Asia/Kathmandu (ISO Monday-start week, documented); future and unsupported periods get clarification instead of fabricated data
+- Response labels reuse `intelligence.InsightKind` (FACT / CALCULATION / ANALYSIS / PROJECTION) with a `SOURCE: Local financial records.` line; existing projections re-used with explicit "projection only — not a guarantee" wording
+- Read-only: `AssistantRepository` composes existing repositories/DAO aggregates — no write methods, **no database schema change (still v7)**
+- Secret Target boundary: no `SecretTargetStore` dependency anywhere in assistant code; fixed refusal text; value never derivable from or present in responses (verified by set-and-compare tests)
+- Session-local conversation history (bounded to 40 messages, never persisted); dashboard "Ask" entry + dedicated assistant screen
+- Not a chatbot: no free-form generation, no advice beyond recorded-data answers, deterministic output for identical input
+
+Phase 10 Legitimate Financial Import:
 
 A safe, explicit CSV import flow: file/paste → parse → read-only preview → validation → duplicate review → explicit confirmation → ordinary transactions (manual file selection only — no scraping, no auth bypass, no credential/OTP handling):
 - CSV schema with required `date, description, amount, direction, account` and optional `category, external_ref`, documented header aliases, explicit ambiguity/missing-column rejection
@@ -67,7 +79,7 @@ Phase 2 foundation:
 - Room database v2 (accounts, categories, transactions, goals)
 - Long minor-unit monetary representation
 - Explicit migration from Phase 1 to Phase 2
-- 434 passing unit/database/migration/dashboard/intelligence/budget/work/goal/secret-target/telecom/opportunity/import/security tests
+- 539 passing unit/database/migration/dashboard/intelligence/budget/work/goal/secret-target/telecom/opportunity/import/security/assistant tests
 
 ## Roadmap
 
@@ -84,7 +96,7 @@ Phase 2 foundation:
 | 8 | Telecom Tracker | ✅ Complete |
 | 9 | Opportunity Intelligence | ✅ Complete |
 | 10 | CSV Import | ✅ Complete |
-| 11 | Local Financial Assistant | ⬜ Planned |
+| 11 | Local Financial Assistant | ✅ Complete |
 | 12 | Security / Backup / Restore | ⬜ Planned |
 | 13 | Real Device Testing / Release | ⬜ Planned |
 

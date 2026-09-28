@@ -10,6 +10,11 @@ SHADOW MONEY is a personal Android financial-management application. Phase 2 imp
 
 ```
 com.prasbin.shadowmoney
+├── assistant             # Phase 11: deterministic read-only financial assistant
+│   ├── IntentClassifier.kt   # Bounded deterministic intent/period recognition
+│   ├── AssistantEngine.kt    # Pure response renderer (FACT/CALCULATION/ANALYSIS/PROJECTION)
+│   ├── AssistantTime.kt      # Kathmandu period ranges (ISO weeks, budget months)
+│   └── AssistantData.kt      # Immutable read-only snapshot models
 ├── data                    # Room entities, DAOs, repositories, database
 │   ├── model               # Account, Category, Transaction, Goal entities
 │   ├── repositories        # AccountRepository, CategoryRepository, etc.
@@ -228,6 +233,26 @@ A legitimate, user-driven CSV import flow that turns file-or-paste CSV data into
 
 **Financial separation**: import never fabricates data — amounts, directions, and dates come only from the file; duplicates are never silently collapsed or auto-imported; preview shows only what already exists plus what the file would add; the normal financial source of truth (transactions table) remains the single ledger.
 
+### Local Financial Assistant (Phase 11)
+
+A deterministic, offline, read-only assistant that answers **bounded** questions about the user's own recorded financial records. It is not a general-purpose AI assistant: no model, no network, no free-form generation, no advice beyond what the recorded data supports, and no writes of any kind. **Phase 11 does not change the database schema (still v7).**
+
+**Package structure** — pure Kotlin domain under `assistant/` + one read-only data composer:
+- `assistant/AssistantIntent.kt` — bounded intent set (`BALANCE`, `INCOME`, `OUTFLOW`, `BUDGET`, `GOALS`, `WORK`, `TELECOM`, `OPPORTUNITIES`, `TRANSACTIONS`, `IMPORT`, `HELP`) plus explicit non-answer states (`SECRET_TARGET_REFUSAL`, `AMBIGUOUS`, `CLARIFY_PERIOD`, `UNSUPPORTED`); bounded periods (`TODAY`, `YESTERDAY`, `THIS_WEEK`, `LAST_WEEK`, `THIS_MONTH`, `LAST_MONTH`, `RECENT`); `requiresData` / `defaultPeriod` extensions and `ClassifiedQuestion.resolvedPeriod()` (explicit period, else deterministic per-intent default).
+- `assistant/IntentClassifier.kt` — deterministic normalization (lowercase → collapse whitespace → trim → strip trailing punctuation) and priority-ordered classification: blank → HELP; Secret Target phrases → `SECRET_TARGET_REFUSAL` (hard privacy boundary checked before anything else); exact help phrasings → HELP; future-period phrases → `CLARIFY_PERIOD` (never fabricate future data); unsupported-period phrases → `CLARIFY_PERIOD`; import/CSV tokens → IMPORT (workflow before scoring); then scored matching (strong phrase = 3 points, whole-token keyword = 1 point) where a tie between top scorers → `AMBIGUOUS` and no scorer → `UNSUPPORTED` (never guess); finally period extraction (multiple distinct periods → `CLARIFY_PERIOD`) and intent-specific period validation (budgets are monthly; income/spending need a real range for "recent"). No randomness — identical input yields identical classification (regression-tested).
+- `assistant/AssistantTime.kt` — half-open `[start, end)` period ranges computed in `Asia/Kathmandu` (`BudgetCalendar.KATHMANDU_ZONE`, UTC+05:45, no DST). "This week" = current ISO week starting **Monday** in Kathmandu, "last week" = the week before (documented convention). Month boundaries reuse `BudgetCalendar` exactly (`monthStart` / `monthEndExclusive` / `currentMonthKey` / `shiftMonth` / `monthLabel`), so budget month keys and assistant periods can never disagree.
+- `assistant/AssistantData.kt` — immutable read-only snapshot models (accounts, period totals, window/recent transactions, budget views, goals, work, telecom, opportunities, projection insight). Contains **no** Secret Target value and no reference to secret-target storage.
+- `assistant/AssistantEngine.kt` — pure renderer: `answer(question, data) → AssistantResponse(sections, source)`. Data-intent answers are composed from the provided snapshot only; non-answer states render fixed guidance strings. Sections reuse `intelligence.InsightKind` labels (`FACT` / `CALCULATION` / `ANALYSIS` / `PROJECTION`) or `kind = null` for plain guidance; every response carries `source = "Local financial records."`. Output is bounded (accounts ≤ 8 lines, transactions/goals/work/opportunities/categories/renewals/budget categories ≤ 5 lines, with an explicit "…and N more" line). The Phase 4 projection insight, when present, is re-rendered with an explicit `PROJECTION —` prefix and "Projection only — not a guarantee." wording. Amount formatting always uses `Money.formatNpr` (existing helper).
+- `data/AssistantRepository.kt` — **read-only** composer with **no write methods**: `load(question)` assembles `AssistantData` from existing authoritative sources only — `DashboardRepository` (balances, recent transactions), `BudgetRepository` (budget math), `GoalRepository` (goal progress), `WorkRepository` (expected vs received), `TelecomRepository` (expected monthly cost), `OpportunityRepository` (summaries), `IntelligenceRepository` (existing projections), plus scalar period aggregates on `TransactionDao` (`getIncomeTotalForPeriod`, `getOutflowTotalForPeriod`, `getCountInPeriod`, `getCountInPeriodByDirection` — the genuinely missing period sums/counts) and a per-category period breakdown via the same deterministic SQL aggregation `BudgetRepository` uses for monthly spending, parameterized for assistant periods. It has no `SecretTargetStore` dependency and never touches secret-target storage (verified by constructor-reflection and source-scan tests).
+
+**Presentation** — `presentation/screen/assistant/AssistantViewModel` + `AssistantScreen` (route `assistant`, dashboard top-bar "Ask" entry): chat-style session where each submit runs classify → (if `requiresData`) `repository.load` → `engine.answer`, displayed with kind chips and a `SOURCE:` line. Conversation history is **session-local only** — bounded to `MAX_MESSAGES = 40`, held in the ViewModel, never persisted, never written to the database, and discarded when the screen/ViewModel goes away. Repository failures surface the fixed `ASSISTANT_READ_ERROR_TEXT` ("Your records were not changed.") and recover; blank input is ignored; only one request is processed at a time.
+
+**Secret Target boundary** (`AssistantPrivacyTest`, 9 tests): assistant sources contain no `SecretTargetStore` reference and no logging; the repository constructor has no secret-store parameter; `AssistantData` has no secret fields; secret-target questions classify to `SECRET_TARGET_REFUSAL` and render the fixed refusal text with `kind = null` regardless of any stored secret; the secret value (raw or formatted) never appears in any financial answer; changing the stored secret before/while answering produces byte-identical responses (set-and-compare); asking questions never mutates the database.
+
+**Read-only guarantee** (`AssistantRepositoryTest`, `everyIntentAnswer_isReadOnly_databaseNeverChanges`): full table dumps (accounts, categories, transactions, goals, work items, opportunities, telecom entities, budgets) are captured before and after answering every intent — including clarification/refusal/unsupported paths — and compared for equality. `AssistantViewModelTest` repeats the guarantee at the ViewModel level.
+
+**Limitations (documented, by design)**: bounded intents only — anything else gets an honest unsupported/ambiguous response; periods are the seven deterministic options above (no custom date ranges yet); "recent" lists the latest 20 dashboard transactions (5 shown); budget answers are monthly; projections are re-used Phase 4 outputs, never newly generated; identical input always yields identical output (no personalization or learning).
+
 ### Dependencies
 
 Same versions as SHADOW LEARN project for consistency:
@@ -248,3 +273,4 @@ Same versions as SHADOW LEARN project for consistency:
 - Local-only data
 - Exact integer monetary representation
 - No floating-point arithmetic
+- Assistant is read-only, offline, and deterministic; no `SecretTargetStore` access and no writes (Phase 11)

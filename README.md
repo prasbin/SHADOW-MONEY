@@ -4,7 +4,18 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 10 — Legitimate Financial Import** ✅ COMPLETE
+**Phase 11 — Local Financial Assistant** ✅ COMPLETE
+
+A deterministic, offline, read-only assistant that answers bounded questions about the user's own recorded financial data (not a general-purpose AI assistant):
+- Intents: BALANCE / INCOME / OUTFLOW / BUDGET / GOALS / WORK / TELECOM / OPPORTUNITIES / TRANSACTIONS / IMPORT / HELP plus SECRET_TARGET_REFUSAL, AMBIGUOUS, CLARIFY_PERIOD, UNSUPPORTED — anything outside the bounded set gets an honest refusal/clarification, never a guess
+- Deterministic keyword/phrase classification (no model, no randomness, no network); ambiguous ties and unknown questions are never guessed
+- Periods: today / yesterday / this week / last week / this month / last month / recent — all computed in Asia/Kathmandu (ISO weeks start Monday, documented); future and unsupported periods get clarification, never fabricated data
+- Responses reuse the existing `InsightKind` labels FACT / CALCULATION / ANALYSIS / PROJECTION with a `SOURCE: Local financial records.` line; projections are explicitly prefixed and marked as not guarantees
+- Read-only architecture: `AssistantRepository` composes existing repositories only — no write methods, **no database schema change** (still v7)
+- Secret Target boundary: assistant code has no `SecretTargetStore` dependency; secret-target questions get a fixed refusal and the value never appears in any response
+- Session-local bounded conversation history (40 messages, never persisted); dashboard "Ask" entry + dedicated screen
+
+Previous phase: **Phase 10 — Legitimate Financial Import** ✅ COMPLETE
 
 A safe, explicit CSV import flow that turns file/paste CSV data into ordinary transactions (no scraping, no auth bypass, manual file selection only):
 - Import flow: choose source → parse → read-only preview → validation/duplicate review → explicit confirmation → normal transactions
@@ -43,6 +54,7 @@ A practical, local-first opportunity tracking and organization system (manual tr
 ## Navigation
 
 - Dashboard
+- Financial Assistant
 - Transactions
 - Money
 - Jobs
@@ -81,7 +93,13 @@ Phase 9 → Phase 10 (`MIGRATION_6_7`) is purely additive: `ALTER TABLE transact
 
 ## Testing Status
 
-**Phase 10 Tests: 434 tests PASSING**
+**Phase 11 Tests: 539 tests PASSING**
+- Intent classifier (intents, periods, priorities, ambiguity, determinism) (23 tests)
+- Assistant time ranges (Kathmandu, ISO weeks, budget months) (12 tests)
+- Assistant engine (responses, labels, limits, Secret Target refusal) (34 tests)
+- Assistant repository (period aggregates, read-only, determinism) (16 tests)
+- Assistant privacy boundary (no Secret Target dependency/leakage) (9 tests)
+- Assistant ViewModel (session, errors, bounded history) (11 tests)
 - CSV parser (RFC4180 quoting/blank lines/BOM) (18 tests)
 - CSV schema mapping / aliases / ambiguity (11 tests)
 - Import amount rules (Long exact, grouping, decimals, direction) (17 tests)

@@ -33,6 +33,15 @@ interface TransactionDao {
     @Query("SELECT COALESCE(SUM(amountMinor), 0) FROM transactions WHERE direction = 1 AND transactionTimestamp >= :start AND transactionTimestamp < :end")
     suspend fun getOutflowTotalForPeriod(start: Long, end: Long): Long
 
+    @Query("SELECT COALESCE(SUM(amountMinor), 0) FROM transactions WHERE direction = 0 AND transactionTimestamp >= :start AND transactionTimestamp < :end")
+    suspend fun getIncomeTotalForPeriod(start: Long, end: Long): Long
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE transactionTimestamp >= :start AND transactionTimestamp < :end")
+    suspend fun getCountInPeriod(start: Long, end: Long): Int
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE direction = :direction AND transactionTimestamp >= :start AND transactionTimestamp < :end")
+    suspend fun getCountInPeriodByDirection(start: Long, end: Long, direction: Int): Int
+
     @Query("SELECT COALESCE(SUM(amountMinor), 0) FROM transactions WHERE direction = 1 AND categoryId = :categoryId AND transactionTimestamp >= :start AND transactionTimestamp < :end")
     suspend fun getOutflowTotalForCategoryPeriod(categoryId: Long, start: Long, end: Long): Long
 
