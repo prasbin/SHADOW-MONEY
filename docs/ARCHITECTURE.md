@@ -308,6 +308,21 @@ Payload group keys and every record's field keys are emitted in sorted order; th
 
 **Limitations (documented, by design)**: no encryption at rest for exports; no cloud/Drive/network sync or automatic scheduled backups; no partial/selected restore (full replacement only, no merge); no cross-version forward compatibility beyond rejecting unknown format versions; checksum is integrity verification, not authentication; 10 MB export bound (larger datasets must be split externally); restore always targets the whole backup scope (restoring a subset requires restoring then re-entering data manually).
 
+## Phase 13 — Real Device Testing / Release Verification
+
+Final phase: verification-only. No new features, no database schema change (still Room v7). All 27 phases were exercised end-to-end on an Android 16 (API 36, x86_64) emulator through ADB + `uiautomator dump` UI exploration; **no physical device was available** (documented as an honest limitation).
+
+**Verified-blocker fixes** (all pre-existing issues found by device testing):
+- `DashboardScreen` bottom bar: the Money and Settings `NavigationBarItem`s had `onClick = { }` (dead taps) — now navigate to `Screen.Money` / `Screen.Settings`.
+- `MoneyPlaceholderScreen`: added a "View Transactions" button navigating to `Screen.Transactions` (the Transactions hub was previously unreachable from the UI); the Jobs bar item remains an intentionally unwired legacy placeholder — the Work screen (Phase 6) is the supported work tracker.
+- `SettingsScreen`: the version label was hardcoded `v0.1.0-phase1` — now renders `BuildConfig.VERSION_NAME` so it can never drift from `app/build.gradle.kts` (`versionName = "0.1.0-phase2"`).
+
+**Release signing**: `app/build.gradle.kts` defines a `release` signing config that reads an **external, machine-local** properties file (default `C:/Users/User/SHADOW-MONEY-KEYS/signing.properties`, overridable via `-DSHADOW_MONEY_SIGNING_PROPS` / env `SHADOW_MONEY_SIGNING_PROPS`) containing `storeFile`, `storePassword`, `keyAlias`, `keyPassword`. The keystore and properties file live **outside the repository** (covered by `.gitignore` rules `*.jks` / `*.keystore` / `*.apk`), values are never logged, and a missing file falls back to an unsigned build instead of failing or embedding credentials. The release `buildType` uses `signingConfigs.findByName("release")`.
+
+**Verified on-device**: navigation across all 13 routes; exact financial arithmetic against the synthetic fixture; intelligence labels and empty states; CSV import preview→discard (zero writes)→confirm→duplicates→malformed rejection; assistant answering all 14 tested topics with correct labels, Secret Target refusal, zero writes, and session-only history; export/restore with checksum round-trip and tampered-file rejection; Secret Target set/mask/reveal/edit/clear with absence from Dashboard, assistant and exports; persistence across force-stop/relaunch.
+
+**Permissions/network**: merged manifest carries only four library-merged install-time permissions (`FOREGROUND_SERVICE`, `RECEIVE_BOOT_COMPLETED`, `ACCESS_NETWORK_STATE`, `WAKE_LOCK`), zero runtime permissions, no `INTERNET` permission, zero network APIs in source and zero network dependencies; logcat from the app PID shows no network activity.
+
 ### Dependencies
 
 Same versions as SHADOW LEARN project for consistency:
@@ -330,3 +345,5 @@ Same versions as SHADOW LEARN project for consistency:
 - No floating-point arithmetic
 - Assistant is read-only, offline, and deterministic; no `SecretTargetStore` access and no writes (Phase 11)
 - Backup/restore is SAF-only with zero manifest permissions, no network, no logging, a 10 MB bound, atomic full-replacement restore, plain-JSON (unencrypted) exports, and total Secret Target exclusion (Phase 12)
+- Release signing uses an external keystore + properties file outside the repository; never committed, never logged; missing file degrades to an unsigned build (Phase 13)
+- No `INTERNET` permission, no runtime permissions, no network APIs or network dependencies anywhere in the app (verified on-device, Phase 13)

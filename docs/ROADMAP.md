@@ -1,6 +1,17 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 12 — Security / Backup / Restore / Export / Import ✅ COMPLETE
+## Current Status: Phase 13 — Real Device Testing / Release ✅ COMPLETE
+
+Final phase, executed on an Android 16 (API 36) emulator via ADB (no physical device was available — documented honestly):
+- All 27 phases exercised end-to-end on-device (navigation, financial core, intelligence, budgets, work, goals + Secret Target, telecom, opportunities, CSV import, assistant, backup/restore/export)
+- Verified blockers fixed (no new features, no schema change — still v7): dead Money/Settings bottom-bar wiring, Money placeholder → Transactions route, Settings version label → `BuildConfig.VERSION_NAME`
+- Release APK signed with an external keystore (outside the repo), `apksigner verify` → Verifies (v2 scheme), versionCode 2 / versionName 0.1.0-phase2
+- Secret Target device-tested: set/mask/reveal/edit/clear, absent from Dashboard, assistant and exports, survives relaunch
+- Tampered backup rejected on-device with existing data unchanged; export/restore checksum round-trip verified
+- Permissions: 4 install-time (library-merged), 0 runtime, no INTERNET; no network APIs/deps in the codebase
+- 656 tests passing, lint 0 errors / 26 warnings (unchanged); docs updated; all work committed and pushed
+
+Previous phase: Phase 12 — Security / Backup / Restore / Export / Import ✅ COMPLETE
 
 Local-first full backup with integrity verification and atomic full-replacement restore (no cloud, no network, no auto-backup):
 - Backup scope: all ten entity groups (accounts, categories, transactions, budgets, goals, work items, telecom SIMs/packages/subscriptions, opportunities) with IDs, relationships, exact Long minor units, timestamps, archived states, `source`, `externalRef`, budget month keys
@@ -110,7 +121,7 @@ Phase 2 foundation:
 | 10 | CSV Import | ✅ Complete |
 | 11 | Local Financial Assistant | ✅ Complete |
 | 12 | Security / Backup / Restore | ✅ Complete |
-| 13 | Real Device Testing / Release | ⬜ Planned |
+| 13 | Real Device Testing / Release | ✅ Complete |
 
 ## Financial Objective
 

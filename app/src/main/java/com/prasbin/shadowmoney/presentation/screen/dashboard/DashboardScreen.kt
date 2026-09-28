@@ -171,13 +171,13 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController? = null
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = { },
+                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Money.route) },
                     icon = { Text("$") },
                     label = { Text("Money") }
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = { },
+                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Settings.route) },
                     icon = { Text("S") },
                     label = { Text("Settings") }
                 )
@@ -607,6 +607,17 @@ fun MoneyPlaceholderScreen(navController: androidx.navigation.NavHostController?
                 color = DarkOnSurfaceVariant
             )
             Spacer(modifier = Modifier.height(24.dp))
+            OutlinedButton(
+                onClick = {
+                    navController?.navigate(
+                        com.prasbin.shadowmoney.presentation.navigation.Screen.Transactions.route
+                    )
+                },
+                border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan)
+            ) {
+                Text("View Transactions", color = NeonCyan)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             OutlinedButton(
                 onClick = {
                     navController?.navigate(

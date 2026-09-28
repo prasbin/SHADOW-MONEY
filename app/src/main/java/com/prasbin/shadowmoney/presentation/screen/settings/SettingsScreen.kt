@@ -172,7 +172,7 @@ fun SettingsScreen() {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "SHADOW MONEY v0.1.0-phase1",
+                text = "SHADOW MONEY v${com.prasbin.shadowmoney.BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = DarkOnSurfaceVariant
             )

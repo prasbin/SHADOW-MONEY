@@ -4,7 +4,25 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 12 — Backup / Restore / Export / Import** ✅ COMPLETE
+**Phase 13 — Real Device Testing / Release Verification** ✅ COMPLETE
+
+Final verification phase: everything below was exercised end-to-end on a real Android runtime (Android 16 / API 36 emulator, ADB-driven UI exploration with `uiautomator dump`), verified blockers fixed, release build signed and signature-verified (no new features, no schema change, still Room v7):
+- Environment: Android 16 (API 36, x86_64) emulator device — **no physical device was available** (honest limitation, documented); app package `com.prasbin.shadowmoney.debug` installed, cold/warm launched and exercised entirely on-device
+- Verified-blocker fixes (all pre-existing, found by device testing): dead Money and Settings bottom-bar items were wired to their routes; the Money placeholder gained a "View Transactions" route to the otherwise-unreachable Transactions hub; the Settings version label now reads `BuildConfig.VERSION_NAME` (`SHADOW MONEY v0.1.0-phase2`) instead of a hardcoded `v0.1.0-phase1`
+- Navigation: all 13 registered routes reachable and alive (Dashboard, Goals, Budgets, Work, Telecom, Opps, Money, Transactions, Import, Assistant, Settings, Backup & Restore)
+- Financial core on-device: dashboard balance/income/outflow/category math exact against the synthetic fixture (NPR 1,260.00 / 800.00 / 540.00), goal progress account-linked, budget states including OVER_BUDGET with the "not additional money" note, work Expected/Received/Remaining correct, telecom and opportunity amounts never entering financial totals
+- Intelligence: FACT / CALCULATION / ANALYSIS / PROJECTION labels correct, empty state ("No financial records yet") observed, projections carry disclaimers, no fabricated insights
+- CSV import on-device: read-only preview banner → Discard leaves counts untouched (zero-write proven) → confirm imports exactly 2 rows → duplicate rows reported against existing records, never auto-merged → malformed CSV rejected with per-row validation errors
+- Local assistant on-device: 14/14 topics answered with correct labels (balance, income, spending, budget, goals, work, telecom, opportunities, transactions, import, help, unsupported→bounded refusal, ambiguous→clarification, **Secret Target→fixed refusal**); settings counts unchanged after all sessions (read-only proven); session history cleared by process death as designed
+- Backup/restore on-device: deterministic export with checksum, full restore with the verbatim destructive warning and exact counts, tampered file rejected ("The backup checksum does not match; the file was modified or damaged") with existing data untouched
+- Secret Target on-device: set → masked bullets by default → reveal → edit (pre-filled) → clear (confirmation dialog), value absent from Dashboard, assistant and the exported JSON (re-scanned while the value was set), survives force-stop/relaunch
+- Persistence: force-stop + relaunch preserves all 19 records and every screen's data; assistant conversation does not persist (session-only, by design)
+- Release: signed `app-release.apk` (external keystore + properties file outside the repo, never logged/committed), `apksigner verify` → Verifies, v2 scheme true, signer CN=Prasbin Dhungana, versionCode 2 / versionName 0.1.0-phase2
+- Permissions: 4 install-time library-merged permissions (FOREGROUND_SERVICE, RECEIVE_BOOT_COMPLETED, ACCESS_NETWORK_STATE, WAKE_LOCK), 0 runtime permissions, no INTERNET, 0 network APIs in source and 0 network dependencies; logcat from the app PID shows no network activity
+- Security: tracked-file scan clean (no keystore/APK/backup/CSV artifacts), diff reviewed, `.gitignore` covers `*.apk`/`*.jks`/`*.keystore`
+- Tests: **656 passing / 63 suites / 0 failures / 0 errors**; lint **0 errors, 26 warnings** (unchanged baseline)
+
+Previous phase: **Phase 12 — Backup / Restore / Export / Import** ✅ COMPLETE
 
 Local-first full backup with integrity verification and atomic restore (no cloud, no network, no auto-backup):
 - Backup scope: accounts, categories, transactions, budgets, goals, work items, telecom SIMs/packages/subscriptions, opportunities — IDs, relationships, exact Long minor units, timestamps, archived states, `source`, `externalRef` and budget month keys are preserved
@@ -106,7 +124,7 @@ Phase 9 → Phase 10 (`MIGRATION_6_7`) is purely additive: `ALTER TABLE transact
 
 ## Testing Status
 
-**Phase 12 Tests: 656 tests PASSING**
+**Phase 13 / Phase 12 Tests: 656 tests PASSING** (Phase 13 added no new tests — it verified the existing 656 on-device; unit suite, lint and release build all re-run after the Phase 13 fixes with identical results)
 - Backup JSON parser/writer (strict integers, duplicate keys, escapes, depth, canonical output) (14 tests)
 - Backup serialization (full roundtrip, exact Longs, nulls/externalRef, archived states, determinism, envelope structure, rejection codes) (16 tests)
 - Backup checksum (SHA-256 vectors, tampering, canonicalization, reordering, algorithm) (13 tests)

@@ -1,4 +1,6 @@
 import org.gradle.api.tasks.testing.Test
+import java.io.File
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -20,6 +22,34 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // Release signing reads an external machine-local properties file that lives
+        // OUTSIDE this repository (never committed). Values are never logged.
+        // Override the location with -DSHADOW_MONEY_SIGNING_PROPS=<path> if needed.
+        val signingPropsPath = System.getProperty("SHADOW_MONEY_SIGNING_PROPS")
+            ?: System.getenv("SHADOW_MONEY_SIGNING_PROPS")
+            ?: "C:/Users/User/SHADOW-MONEY-KEYS/signing.properties"
+        val signingPropsFile = File(signingPropsPath)
+        if (signingPropsFile.isFile) {
+            val signingProps = Properties().apply {
+                signingPropsFile.inputStream().use { load(it) }
+            }
+            val storePath = signingProps.getProperty("storeFile")
+            val storePwd = signingProps.getProperty("storePassword")
+            val alias = signingProps.getProperty("keyAlias")
+            val keyPwd = signingProps.getProperty("keyPassword")
+            if (storePath != null && storePwd != null && alias != null && keyPwd != null) {
+                create("release") {
+                    val sf = File(storePath)
+                    storeFile = if (sf.isAbsolute) sf else File(signingPropsFile.parentFile, storePath)
+                    storePassword = storePwd
+                    keyAlias = alias
+                    keyPassword = keyPwd
+                }
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -30,6 +60,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
