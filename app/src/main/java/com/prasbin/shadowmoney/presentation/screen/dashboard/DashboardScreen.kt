@@ -566,7 +566,7 @@ private fun InsightRow(insight: com.prasbin.shadowmoney.intelligence.Insight) {
 }
 
 @Composable
-fun MoneyPlaceholderScreen() {
+fun MoneyPlaceholderScreen(navController: androidx.navigation.NavHostController? = null) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -595,6 +595,17 @@ fun MoneyPlaceholderScreen() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = DarkOnSurfaceVariant
             )
+            Spacer(modifier = Modifier.height(24.dp))
+            OutlinedButton(
+                onClick = {
+                    navController?.navigate(
+                        com.prasbin.shadowmoney.presentation.navigation.Screen.Import.route
+                    )
+                },
+                border = androidx.compose.foundation.BorderStroke(1.dp, NeonCyan)
+            ) {
+                Text("Import Transactions (CSV)", color = NeonCyan)
+            }
         }
     }
 }

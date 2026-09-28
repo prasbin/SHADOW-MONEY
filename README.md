@@ -4,7 +4,18 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 9 — Opportunity Intelligence** ✅ COMPLETE
+**Phase 10 — Legitimate Financial Import** ✅ COMPLETE
+
+A safe, explicit CSV import flow that turns file/paste CSV data into ordinary transactions (no scraping, no auth bypass, manual file selection only):
+- Import flow: choose source → parse → read-only preview → validation/duplicate review → explicit confirmation → normal transactions
+- CSV schema: required `date, description, amount, direction, account`; optional `category, external_ref` with documented header aliases
+- Exact Long minor-unit amounts (never floats), ≤2 decimals, explicit Kathmandu-local date formats only
+- Row states NEW / POSSIBLE_DUPLICATE / INVALID with default selections (duplicates never auto-imported)
+- Atomic final write in one Room transaction (`transactions.source = IMPORT_FILE`, `externalRef` preserved); failed batch = nothing written
+- Storage Access Framework only (`OpenDocument`), 5 MB input bound, no storage/network permissions, no logging of CSV contents
+- Room schema v7: new `transactions.externalRef` column via additive `MIGRATION_6_7` (v6 → v7)
+
+Previous phase: **Phase 9 — Opportunity Intelligence** ✅ COMPLETE
 
 A practical, local-first opportunity tracking and organization system (manual tracking only — never automated job acquisition):
 - Opportunities with bounded types (Freelance / Client Work / Part Time / Remote Work / Project / Repository / Other) and explicit lifecycle statuses (New / Reviewing / Applied / In Progress / Won / Lost / Archived)
@@ -23,7 +34,7 @@ A practical, local-first opportunity tracking and organization system (manual tr
 - Kotlin
 - Jetpack Compose
 - Material 3 (Dark Theme)
-- Room / SQLite (v2)
+- Room / SQLite (v7)
 - DataStore (preferences)
 - WorkManager
 - Android Storage Access Framework
@@ -66,9 +77,20 @@ Help the user work toward consistently earning at least **NPR 100,000/month**.
 
 Phase 1 v1 contained only the structural `placeholder` table (no user financial data). Phase 1 → Phase 2 migration (`MIGRATION_1_2`) drops `placeholder` and creates all four entity tables with safe FK actions (`transactions.accountId` RESTRICT, `transactions.categoryId` SET NULL, `goals.accountId` SET NULL; no CASCADE). Verified by genuine v1 → v2 migration tests.
 
+Phase 9 → Phase 10 (`MIGRATION_6_7`) is purely additive: `ALTER TABLE transactions ADD COLUMN externalRef TEXT DEFAULT NULL`. Existing rows keep their data with a NULL reference; no destructive change, no table rebuild. Verified by a genuine populated v6 → v7 migration test.
+
 ## Testing Status
 
-**Phase 9 Tests: 309 tests PASSING**
+**Phase 10 Tests: 434 tests PASSING**
+- CSV parser (RFC4180 quoting/blank lines/BOM) (18 tests)
+- CSV schema mapping / aliases / ambiguity (11 tests)
+- Import amount rules (Long exact, grouping, decimals, direction) (17 tests)
+- Import date rules (Kathmandu-local formats, rejections) (13 tests)
+- Import engine (row states, duplicates, mapping, reasons) (31 tests)
+- Import repository (no-write preview, atomic import, FK rollback) (13 tests)
+- Import security boundary (no permissions, no network/logging/credentials, 5 MB bound) (7 tests)
+- Import v6→v7 migration (populated data preserved, externalRef added) (3 tests)
+- Import transactions ViewModel (state machine, selection, confirmation) (12 tests)
 - Money arithmetic (5 tests)
 - Account database (5 tests)
 - Category database (5 tests)

@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Database(
     entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class, WorkItem::class, TelecomSim::class, TelecomPackage::class, TelecomSubscription::class, Opportunity::class],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class ShadowMoneyDatabase : RoomDatabase() {
@@ -43,7 +43,10 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
                     ShadowMoneyDatabase::class.java,
                     "shadow_money_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(
+                        MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+                        MIGRATION_5_6, MIGRATION_6_7
+                    )
                     .build()
                 INSTANCE = instance
                 instance
@@ -221,5 +224,11 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_opportunities_status` ON `opportunities` (`status`)")
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_opportunities_type` ON `opportunities` (`type`)")
         database.execSQL("CREATE INDEX IF NOT EXISTS `index_opportunities_deadlineTimestamp` ON `opportunities` (`deadlineTimestamp`)")
+    }
+}
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE `transactions` ADD COLUMN `externalRef` TEXT DEFAULT NULL")
     }
 }

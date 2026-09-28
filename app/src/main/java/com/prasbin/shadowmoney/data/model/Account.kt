@@ -17,6 +17,8 @@ const val CATEGORY_DIRECTION_BOTH = 2
 const val TRANSACTION_DIRECTION_INCOME = 0
 const val TRANSACTION_DIRECTION_OUTFLOW = 1
 
+const val TRANSACTION_SOURCE_IMPORT_FILE = "IMPORT_FILE"
+
 @Entity(tableName = "accounts")
 data class Account(
     @PrimaryKey(autoGenerate = true)
@@ -81,7 +83,9 @@ data class Transaction(
     val transactionTimestamp: Long = System.currentTimeMillis(),
     val note: String = "",
     val createdTimestamp: Long = System.currentTimeMillis(),
-    val source: String = ""
+    val source: String = "",
+    @androidx.room.ColumnInfo(defaultValue = "NULL")
+    val externalRef: String? = null
 )
 
 @Entity(

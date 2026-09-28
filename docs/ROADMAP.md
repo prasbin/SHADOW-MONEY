@@ -1,8 +1,17 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 9 — Opportunity Intelligence ✅ COMPLETE
+## Current Status: Phase 10 — Legitimate Financial Import ✅ COMPLETE
 
-A practical, local-first opportunity tracking and organization system (manual tracking only — never automated job acquisition):
+A safe, explicit CSV import flow: file/paste → parse → read-only preview → validation → duplicate review → explicit confirmation → ordinary transactions (manual file selection only — no scraping, no auth bypass, no credential/OTP handling):
+- CSV schema with required `date, description, amount, direction, account` and optional `category, external_ref`, documented header aliases, explicit ambiguity/missing-column rejection
+- Exact Long minor-unit amounts (never floats), ≤2 decimals, Kathmandu-local unambiguous date formats
+- Row states NEW / POSSIBLE_DUPLICATE / INVALID; duplicates default to unselected; unmatched account/category names require explicit mapping
+- Atomic confirmed import in one Room transaction (`source = IMPORT_FILE`, `externalRef` preserved); failed batch writes nothing; preview never writes
+- Storage Access Framework only (`OpenDocument`), 5 MB bound, zero app permissions, no network/logging of CSV contents
+- Room v7: additive `MIGRATION_6_7` adds `transactions.externalRef`; all existing data preserved
+
+Phase 9 Opportunity Intelligence:
+- A practical, local-first opportunity tracking and organization system (manual tracking only — never automated job acquisition)
 - Opportunities with bounded types (Freelance / Client Work / Part Time / Remote Work / Project / Repository / Other) and explicit lifecycle statuses (New / Reviewing / Applied / In Progress / Won / Lost / Archived)
 - Expected opportunity amounts (Long minor units, nullable) — explicitly NOT income
 - Manual source/URL references with offline GitHub reference parsing (no fetching, no scraping)
@@ -58,7 +67,7 @@ Phase 2 foundation:
 - Room database v2 (accounts, categories, transactions, goals)
 - Long minor-unit monetary representation
 - Explicit migration from Phase 1 to Phase 2
-- 309 passing unit/database/migration/dashboard/intelligence/budget/work/goal/secret-target/telecom/opportunity tests
+- 434 passing unit/database/migration/dashboard/intelligence/budget/work/goal/secret-target/telecom/opportunity/import/security tests
 
 ## Roadmap
 
@@ -74,7 +83,7 @@ Phase 2 foundation:
 | 7 | Goals + Secret Target | ✅ Complete |
 | 8 | Telecom Tracker | ✅ Complete |
 | 9 | Opportunity Intelligence | ✅ Complete |
-| 10 | CSV Import | ⬜ Planned |
+| 10 | CSV Import | ✅ Complete |
 | 11 | Local Financial Assistant | ⬜ Planned |
 | 12 | Security / Backup / Restore | ⬜ Planned |
 | 13 | Real Device Testing / Release | ⬜ Planned |

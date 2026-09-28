@@ -82,6 +82,10 @@ Phase 1 v1 contained only the structural `placeholder(id, name)` table with no u
 
 `MIGRATION_5_6` (Room version 5 → 6) creates the `opportunities` table with indices `index_opportunities_status`, `index_opportunities_type`, `index_opportunities_deadlineTimestamp`. Non-destructive; all existing tables and data are preserved. Verified by `OpportunityMigrationTest` (real v5 database → actual `MIGRATION_5_6` → all financial/goal/budget/work/telecom data survives, opportunity table/indices created).
 
+### Migration (Phase 9 → Phase 10 / CSV Import)
+
+`MIGRATION_6_7` (Room version 6 → 7) is a single additive statement: `ALTER TABLE transactions ADD COLUMN externalRef TEXT DEFAULT NULL`. No table rebuild, no destructive change; every existing row keeps its values and gets `externalRef = NULL` (Room `@ColumnInfo(defaultValue = "NULL")` matches SQLite's stored default exactly). Imported rows may carry a user-provided external reference (bank export id) in this column; manually created transactions keep it `NULL`. All five pre-existing migration tests were extended to chain `MIGRATION_6_7`. Verified by `ImportMigrationTest` (genuinely populated v6 database with accounts/categories/transactions/goals/budgets/work/telecom/opportunities → actual `MIGRATION_6_7` → all data survives, column exists and is NULL for old rows, new imported transaction with `externalRef` round-trips).
+
 ### Dashboard (Phase 3)
 
 The Dashboard route renders real data from the Phase 2 Room model via Room → DAO/repository → ViewModel/state → Compose UI.
@@ -195,6 +199,34 @@ A local-first opportunity tracking and organization system for manually tracked 
 **Financial separation** (regression-tested in `OpportunityFinancialSeparationTest`): creating an opportunity creates no transaction; expected amount does not change account balance; expected amount does not count as income; expected amount does not affect budgets; status changes (including WON) create no financial records.
 
 **UI**: Opportunities screen (route `opportunities`, bottom-bar entry) with Summary panel (active count, total stored expected amount, needs-review count, ≤5 upcoming deadlines), status/type filter chips, title/client/source/notes search, opportunity cards, create/edit form dialogs, detail dialog with Open-reference action, and explicit Loading/Empty/Content/Error states. Kathmandu timezone for deadlines (No deadline / Upcoming / Due today / Overdue).
+
+### CSV Import / Integration (Phase 10)
+
+A legitimate, user-driven CSV import flow that turns file-or-paste CSV data into ordinary transactions. Manual file selection only — no scraping, no bank/email/API access, no authentication, no credential/OTP/PIN/CVV handling.
+
+**Flow** (one-way state machine, `ImportTransactionsViewModel`, package `presentation.screen.csvimport`, route `import`): `Source` (paste text or SAF file picker) → `Loading` → `PreviewReady` (read-only preview) → user reviews rows/duplicates/mappings → `Importing` → `Success` / `Error`. Alternative outcomes: `PreviewRejected` (bad header/required columns), `EmptyInput` (no data rows), `Error` (oversize input, unreadable file, database failure). Entries: "Import Transactions (CSV)" buttons on the Transactions and Money screens.
+
+**Package structure** — `data/imports` (pure Kotlin, no Android APIs):
+- `CsvParser` — deterministic RFC4180-style parser: quoted fields, escaped quotes, embedded commas/newlines, blank-line skip, BOM strip, per-row structural errors.
+- `CsvStreamReader` — bounded read (≤ `MAX_IMPORT_BYTES` = 5 MB): `Ok` / `TooLarge` / `ReadError`. Content lives in memory only during preview; never persisted, never logged.
+- `ImportSchema` — header normalization (trim, lowercase, non-alphanumeric → `_`) + alias resolution. Required: `date`, `description`, `amount`, `direction`, `account`. Optional: `category`, `external_ref`. Aliases: `transaction_date`, `note`, `type`, `reference`/`transaction_id`. Two columns mapping to one field → explicit "Ambiguous" rejection; zero recognized columns → "Missing header row"; missing required → rejection naming them; unknown columns ignored.
+- `ImportAmount` — exact integer parsing into Long minor units (never Float/Double): optional sign, valid thousands grouping only, ≤ 2 decimal places (more → rejection, never silently rounded), overflow rejection; direction column is authoritative (`income`/`credit`/`cr`/`deposit`/`received`/`in`, `outflow`/`debit`/`dr`/`withdrawal`/`expense`/`spent`/`out`); INCOME must be positive (negative → amount/direction conflict), OUTFLOW stores the absolute magnitude, zero amount is invalid.
+- `ImportDate` — only unambiguous formats (`yyyy-MM-dd`, `yyyy/MM/dd`, `yyyy-MM-dd HH:mm[:ss]`, `yyyy-MM-ddTHH:mm[:ss]`) interpreted in `Asia/Kathmandu` (`BudgetCalendar.KATHMANDU_ZONE`); timezone-qualified input, ambiguous `dd/MM/yyyy`, and impossible calendar dates are rejected with explicit reasons.
+- `ImportModel` / `ImportFingerprint` — immutable preview rows: `NEW` / `POSSIBLE_DUPLICATE` / `INVALID` states plus separate flags for unmatched account/category names; reasons list per invalid row; `isImportable()` gate.
+- `ImportEngine` — pure `buildPreview(document, reference, accountMappings, categoryMappings)`; performs zero database writes.
+- `ImportRepository` — loads reference data (accounts, categories, existing fingerprints) and performs the confirmed write.
+
+**Duplicate detection**: fingerprint = `normalizeText(accountName) | KathmanduDate | amountMinor | direction | normalizeText(categoryName) | normalizeText(note) | normalizeText(externalRef)` (joined by `|`), checked against existing transactions first, then earlier rows inside the same file. `POSSIBLE_DUPLICATE` rows default to **unselected**; importing one requires an explicit per-row decision. No fingerprint ever becomes a database key.
+
+**Confirmation & atomicity**: nothing is written during preview (verified by test). Final import runs inside a single `database.withTransaction { ... }` over the user's explicit selection — an FK violation mid-batch rolls everything back (verified by simulated-failure test). Imported rows are normal `transactions` rows: `source = TRANSACTION_SOURCE_IMPORT_FILE` ("IMPORT_FILE"), optional `externalRef` preserved, same account/category FKs, same balance/income/outflow/budget derivation. There is no second ledger and no permanent import table.
+
+**Mapping**: rows whose account/category name matches (case/whitespace-insensitive) resolve automatically; unmatched names are surfaced and require an explicit `setAccountMapping` / `setCategoryMapping` choice before the row becomes importable. A present-but-empty category/account cell is INVALID (missing), an absent optional category column means `categoryId = null`. Changing a mapping rebuilds the preview and resets default selections.
+
+**UI**: preview screen with counts (total/valid/duplicate/invalid/unmatched), per-row status chips and reasons, duplicate review with per-row import decisions, mapping dropdowns, selection checkboxes, and a confirm action labeled with the selected count ("No write yet — N selected"). SAF `OpenDocument` with `text/csv`, `text/comma-separated-values`, `text/plain`, `text/*`, `application/vnd.ms-excel` mime types; single-document read via `contentResolver`, no persisted permissions, no storage permissions.
+
+**Security boundary** (regression-tested in `ImportSecurityTest`): manifest declares zero permissions (no storage, no network); import sources contain no `java.net`/HTTP/socket code, no logging (`android.util.Log`, `println`) of CSV contents, and no password/OTP/CVV/pin/credential/token/secret handling; 5 MB bound enforced.
+
+**Financial separation**: import never fabricates data — amounts, directions, and dates come only from the file; duplicates are never silently collapsed or auto-imported; preview shows only what already exists plus what the file would add; the normal financial source of truth (transactions table) remains the single ledger.
 
 ### Dependencies
 
