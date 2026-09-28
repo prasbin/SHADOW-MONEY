@@ -1,6 +1,18 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 11 — Local Financial Assistant ✅ COMPLETE
+## Current Status: Phase 12 — Security / Backup / Restore / Export / Import ✅ COMPLETE
+
+Local-first full backup with integrity verification and atomic full-replacement restore (no cloud, no network, no auto-backup):
+- Backup scope: all ten entity groups (accounts, categories, transactions, budgets, goals, work items, telecom SIMs/packages/subscriptions, opportunities) with IDs, relationships, exact Long minor units, timestamps, archived states, `source`, `externalRef`, budget month keys
+- Deterministic versioned JSON (`shadow-money-backup` v1, `appSchemaVersion` 7), integer-only amounts, byte-identical output for identical data; 10 MB bound; plain JSON (no encryption — documented, never called encryption)
+- SHA-256 checksum over the canonical payload bytes (sorted keys, no whitespace); tampered/malformed/unsupported/incompatible files rejected before any restore
+- Restore pipeline: read → strict JSON → format → schema → checksum → record/ref validation → read-only preview with counts → mandatory destructive warning → explicit confirmation → single-transaction full replacement (failure = exact rollback, verified)
+- Existing-data policy: full replacement (no merge); CSV import stays a separate additive flow with duplicate review
+- SAF only (`CreateDocument` export / `OpenDocument` restore), zero manifest permissions, no network/logging of backup contents
+- Secret Target: never in JSON, checksum input, previews or restore files; restore never modifies it
+- Settings Backup & Restore section with preview/confirm dialogs and explicit error states; **no database schema change (still v7)**
+
+Phase 11 Local Financial Assistant:
 
 A deterministic, offline, read-only assistant for bounded questions about recorded financial data (not a general-purpose AI assistant):
 - Bounded intents (A–K): balance, income, outflow, budget, goals, work, telecom, opportunities, transactions, import, help — plus SECRET_TARGET_REFUSAL / AMBIGUOUS / CLARIFY_PERIOD / UNSUPPORTED for anything outside the set; never guesses
@@ -79,7 +91,7 @@ Phase 2 foundation:
 - Room database v2 (accounts, categories, transactions, goals)
 - Long minor-unit monetary representation
 - Explicit migration from Phase 1 to Phase 2
-- 539 passing unit/database/migration/dashboard/intelligence/budget/work/goal/secret-target/telecom/opportunity/import/security/assistant tests
+- 656 passing unit/database/migration/dashboard/intelligence/budget/work/goal/secret-target/telecom/opportunity/import/security/assistant/backup tests
 
 ## Roadmap
 
@@ -97,7 +109,7 @@ Phase 2 foundation:
 | 9 | Opportunity Intelligence | ✅ Complete |
 | 10 | CSV Import | ✅ Complete |
 | 11 | Local Financial Assistant | ✅ Complete |
-| 12 | Security / Backup / Restore | ⬜ Planned |
+| 12 | Security / Backup / Restore | ✅ Complete |
 | 13 | Real Device Testing / Release | ⬜ Planned |
 
 ## Financial Objective

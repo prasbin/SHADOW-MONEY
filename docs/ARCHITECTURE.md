@@ -17,6 +17,8 @@ com.prasbin.shadowmoney
 │   └── AssistantData.kt      # Immutable read-only snapshot models
 ├── data                    # Room entities, DAOs, repositories, database
 │   ├── model               # Account, Category, Transaction, Goal entities
+│   ├── imports             # Phase 10: CSV import (pure Kotlin)
+│   ├── backup              # Phase 12: backup format/JSON/checksum/validator/restore/SAF
 │   ├── repositories        # AccountRepository, CategoryRepository, etc.
 │   ├── Converters.kt       # Room TypeConverters
 │   ├── Money.kt            # Long minor-unit arithmetic
@@ -253,6 +255,59 @@ A deterministic, offline, read-only assistant that answers **bounded** questions
 
 **Limitations (documented, by design)**: bounded intents only — anything else gets an honest unsupported/ambiguous response; periods are the seven deterministic options above (no custom date ranges yet); "recent" lists the latest 20 dashboard transactions (5 shown); budget answers are monthly; projections are re-used Phase 4 outputs, never newly generated; identical input always yields identical output (no personalization or learning).
 
+### Backup / Restore / Export / Import (Phase 12)
+
+Local-first full backup with integrity verification and atomic full-replacement restore. No cloud, no network, no auto-backup, no background scheduling — the user explicitly exports to a location they choose and explicitly restores from a file they pick. **Phase 12 does not change the database schema (still v7).**
+
+**Package structure** — `data/backup/` (file I/O isolated behind one interface, pure logic JVM-testable):
+- `BackupModels.kt` — format constants (`BACKUP_FORMAT_NAME = "shadow-money-backup"`, `BACKUP_FORMAT_VERSION = 1`, `APP_SCHEMA_VERSION = 7`, `BACKUP_CHECKSUM_ALGORITHM = "SHA-256"`, `MAX_BACKUP_BYTES = 10 MB`), the destructive-restore warning text, the `BackupErrorCode` taxonomy (NO_DATA, INVALID_JSON, UNSUPPORTED_FORMAT, INCOMPATIBLE_SCHEMA, CHECKSUM_MISMATCH, MALFORMED_RECORDS, MISSING_REFERENCE, FILE_TOO_LARGE, STORAGE_ERROR, RESTORE_FAILED, UNEXPECTED), explicit backup DTOs (one per entity — Room entities are never serialized blindly), `BackupPayload`, `BackupEnvelope`, `RestoreCandidate`, and the outcome sealed types.
+- `BackupJson.kt` — minimal strict JSON parser/writer. Parser rejects fractional/exponent numbers (integer-only, so money can never become floating point), duplicate object keys (checksum ambiguity), leading zeros, trailing content, raw control characters, and nesting deeper than 32 levels; Long values round-trip exactly (including `Long.MIN/MAX`). Writer is canonical: object keys sorted, no insignificant whitespace, plain digit integers, minimal escaping — the same value always serializes to the same bytes.
+- `BackupChecksum.kt` — SHA-256 (via `java.security.MessageDigest`) over the UTF-8 bytes of the canonical payload JSON; lowercase hex output, case-insensitive comparison.
+- `BackupMappers.kt` — DTO ↔ Room-entity conversions for all ten entity groups.
+- `BackupSerializer.kt` — DTO tree builders, envelope `write` (deterministic), and the intake `read(text, expectedSchemaVersion)` pipeline: strict parse → format name → format version → installed-schema comparison → checksum structure/algorithm → **SHA-256 verification over the canonicalized payload subtree** → typed record decoding with path-precise errors (`transactions[3].amountMinor must be a whole number`). The checksum hashes only the `payload` subtree, so there is no circularity; the envelope (format/versions/timestamp/checksum field) is excluded by design.
+- `BackupBuilder.kt` — pure envelope assembly: same payload + timestamp + schema ⇒ byte-identical document.
+- `BackupValidator.kt` — semantic validation of a decoded payload: positive unique primary keys per group; enum ranges (account type 0–3, category direction 0–2, transaction direction 0–1, work status 0–3, SIM status 0–1, billing period 0–3, opportunity type/status 0–6); `YYYY-MM` month keys parsed with `YearMonth`; non-negative minor-unit amounts (except account opening balance, which may be negative); duplicate budget slots rejected per (monthKey, categoryId); referential integrity for every foreign key (transaction account/category/work, goal account, budget category, subscription SIM/package) → `MISSING_REFERENCE`. Nothing is repaired, skipped, or relaxed — the whole file is rejected.
+- `BackupDao.kt` — query-only DAO (full-table reads, `COUNT(*)` per table, `DELETE` per table) registered on `ShadowMoneyDatabase`; adds no tables/columns/indices, so the schema stays at v7.
+- `RestoreEngine.kt` — single `database.withTransaction { ... }`: delete children-first (transactions → goals → budgets → telecom_subscriptions → opportunities → work_items → telecom_packages → telecom_sims → categories → accounts), then insert parents-first with **original primary keys** (SQLite AUTOINCREMENT advances from explicit ids, so subsequent app inserts never collide). Any exception rolls the whole transaction back.
+- `BackupFileIo.kt` — `BackupTextReader` (bounded read ≤ `MAX_BACKUP_BYTES`, `Ok`/`TooLarge`/`ReadError`) + the `BackupFileIo` interface + `SafBackupFileIo` (`ContentResolver.openInputStream`/`openOutputStream` on the user-picked document URI only).
+- `BackupRepository.kt` — orchestration: `createBackupJson` (load → build → serialize → size check), `prepareRestoreFromUri`/`prepareRestoreText` (read → full intake pipeline → validation → `RestoreCandidate`, zero writes), `restore` (re-validate → atomic engine write), `restoreFromText`, `loadCounts`, `writeBackupToUri`.
+
+**Backup format** (deterministic, versioned):
+```json
+{"appSchemaVersion":7,"checksum":{"algorithm":"SHA-256","value":"<64 hex>"},
+ "createdAtEpochMillis":1800000000000,"format":"shadow-money-backup",
+ "formatVersion":1,"payload":{"accounts":[…],"budgets":[…],"categories":[…],
+ "goals":[…],"opportunities":[…],"telecomPackages":[…],"telecomSims":[…],
+ "telecomSubscriptions":[…],"transactions":[…],"workItems":[…]}}
+```
+Payload group keys and every record's field keys are emitted in sorted order; the whole document is whitespace-free.
+
+**Entities included** (all ten groups, every column): accounts, categories, transactions (incl. `workItemId`, `source`, `externalRef`), goals, budgets (incl. `monthKey`), work_items, telecom_sims, telecom_packages, telecom_subscriptions, opportunities (incl. nullable `expectedAmountMinor`). IDs, relationships, exact Long minor units, timestamps, archived/inactive states are preserved exactly — verified by field-equality roundtrip tests.
+
+**Checksum / integrity**: SHA-256 over the canonical payload bytes only (representation documented above; no circularity). Verification re-canonicalizes the received payload subtree and compares against the declared value (case-insensitive hex, 64 chars). Whitespace reformatting and key reordering still verify; any value tampering, checksum tampering, malformed checksum, or unsupported algorithm is rejected **before validation and before any restore** — never a partial restore. The checksum detects corruption/tampering; it is not authentication and not encryption.
+
+**Export (SAF)**: Settings → "Export backup" → `ActivityResultContracts.CreateDocument("application/json")` → user chooses destination → repository serializes → `SafBackupFileIo` writes UTF-8. Success shows record counts, created timestamp, and the checksum; write failures surface as errors (never a false success). Empty database exports as an explicit empty backup (valid, all groups present, zero counts).
+
+**Import / restore (SAF)**: Settings → "Restore backup" → `ActivityResultContracts.OpenDocument` (mime `application/json`, `text/plain`, `text/*`, `application/octet-stream`) → bounded read → intake pipeline (JSON → format → schema → checksum → records → refs) → **read-only preview** with per-group record counts → mandatory warning dialog showing `RESTORE_WARNING_TEXT` ("Restoring this backup will replace the current SHADOW MONEY financial records.") → explicit "Replace records" confirmation → atomic full replacement → success with counts, or an error explaining that nothing changed. No database write of any kind happens before the confirmation (preview-zero-writes verified by test).
+
+**Validation order** (documented and tested): parse (INVALID_JSON, includes fractional-amount rejection) → format name/formatVersion (UNSUPPORTED_FORMAT) → `appSchemaVersion` vs installed schema read from the database (`INCOMPATIBLE_SCHEMA`) → checksum (CHECKSUM_MISMATCH) → record decoding (MALFORMED_RECORDS with field path) → semantic validation (MALFORMED_RECORDS / MISSING_REFERENCE) → preview.
+
+**Atomicity**: the restore deletes and re-inserts every backup-scope table inside one Room transaction. A failure at any point (tested with a payload whose FK violation occurs mid-insert) rolls back to the exact prior state — row-for-row equality asserted.
+
+**Existing data policy**: **full replacement**, never merge/additive. Pre-existing rows are deleted first; the restored database equals the backup exactly (no duplicates, no renamed leftovers). Restoring the same backup twice is idempotent. No second ledger and no backup tables exist (`sqlite_master` compared before/after restore).
+
+**CSV import separation**: Phase 10 CSV import remains an additive, per-row flow (duplicates reviewed, skipped by default, `source = IMPORT_FILE`) that never deletes anything. Backup restore is the destructive full-replacement flow. Both write only the existing `transactions` table; neither has its own ledger. The UI keeps them in different screens with different confirmations.
+
+**Security**: manifest declares **zero permissions** (SAF grants URI access per document); backup sources contain no network APIs, no logging/println of backup contents, no credential/password/OTP/CVV/token handling; file access uses only `ContentResolver` document streams (no `Environment`/external-storage APIs); 10 MB bound enforced on read **and** export; `.gitignore` keeps `local.properties`/`*.jks`/`*.keystore` out and no backup export files exist in the repository (regression-tested in `BackupSecurityTest`).
+
+**Secret Target exclusion**: the Secret Target lives in DataStore, outside Room; backup DTOs are explicit field lists with no secret field; the checksum input is the payload subtree only (byte-identical checksums with/without a set secret); restore touches only Room tables (secret verified unchanged after full and empty restores); the string never appears in backup JSON (regression-tested in `BackupSecretTargetTest`).
+
+**Encryption status**: **NOT implemented.** Backup files are plain JSON. The SHA-256 checksum provides integrity only, not confidentiality; users must protect exported files themselves. The UI states "Backups are plain JSON files; they are not encrypted." The checksum must never be described as encryption.
+
+**UI**: Settings gains a "Backup & Restore" card: format/schema/integrity/plain-text notices, live record counts, "Export backup" / "Restore backup" buttons, progress states (Exporting/Preparing/Restoring), export success with checksum, the preview confirmation dialog with counts and the destructive warning, and explicit error states — each error names the cause (empty file, invalid JSON, unsupported format, incompatible schema, checksum mismatch, malformed records, missing references, oversized file, storage failure, restore rollback) and never claims success it didn't achieve. State machine: `Idle → Exporting → ExportSuccess|ExportError`, `Idle → Preparing → PreviewReady|PreviewInvalid`, `PreviewReady → Restoring → RestoreSuccess|RestoreError`; `confirmRestore` is a no-op unless the state is `PreviewReady`.
+
+**Limitations (documented, by design)**: no encryption at rest for exports; no cloud/Drive/network sync or automatic scheduled backups; no partial/selected restore (full replacement only, no merge); no cross-version forward compatibility beyond rejecting unknown format versions; checksum is integrity verification, not authentication; 10 MB export bound (larger datasets must be split externally); restore always targets the whole backup scope (restoring a subset requires restoring then re-entering data manually).
+
 ### Dependencies
 
 Same versions as SHADOW LEARN project for consistency:
@@ -274,3 +329,4 @@ Same versions as SHADOW LEARN project for consistency:
 - Exact integer monetary representation
 - No floating-point arithmetic
 - Assistant is read-only, offline, and deterministic; no `SecretTargetStore` access and no writes (Phase 11)
+- Backup/restore is SAF-only with zero manifest permissions, no network, no logging, a 10 MB bound, atomic full-replacement restore, plain-JSON (unencrypted) exports, and total Secret Target exclusion (Phase 12)

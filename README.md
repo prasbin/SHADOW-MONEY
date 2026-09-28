@@ -4,7 +4,20 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
-**Phase 11 — Local Financial Assistant** ✅ COMPLETE
+**Phase 12 — Backup / Restore / Export / Import** ✅ COMPLETE
+
+Local-first full backup with integrity verification and atomic restore (no cloud, no network, no auto-backup):
+- Backup scope: accounts, categories, transactions, budgets, goals, work items, telecom SIMs/packages/subscriptions, opportunities — IDs, relationships, exact Long minor units, timestamps, archived states, `source`, `externalRef` and budget month keys are preserved
+- Deterministic versioned JSON (`shadow-money-backup` format v1, `appSchemaVersion` 7); identical data always produces byte-identical output; amounts are integer minor units only (never floats)
+- SHA-256 checksum over the canonical `payload` bytes (sorted keys, no whitespace) — a corruption/tamper detector, **not** encryption; malformed JSON, unsupported format, incompatible schema and checksum mismatches are rejected before any restore
+- Restore pipeline: read → strict JSON parse → format → schema version → checksum → record validation (positive unique IDs, enum ranges, YYYY-MM month keys, referential integrity, duplicate budget slots — rejected as a whole, never repaired) → read-only preview with record counts → mandatory destructive warning ("Restoring this backup will replace the current SHADOW MONEY financial records.") → explicit confirmation → single-transaction full replacement (a failed transaction rolls back to the exact prior state)
+- Existing-data policy: full replacement (no merge, no duplicate rows); CSV import remains a separate additive flow with duplicate review
+- Export uses SAF `CreateDocument`, restore uses SAF `OpenDocument` — 10 MB file bound, zero manifest permissions, no filesystem scanning
+- Secret Target: never present in backup JSON, checksum input, previews, logs or restore files, and restore never modifies it
+- Encryption status: backups are plain JSON files; the checksum verifies integrity and provides no confidentiality — the user must protect the exported file
+- Settings gains a Backup & Restore section: export, restore, live backup info (format/schema/checksum/record counts) and the preview/confirmation dialogs
+
+Previous phase: **Phase 11 — Local Financial Assistant** ✅ COMPLETE
 
 A deterministic, offline, read-only assistant that answers bounded questions about the user's own recorded financial data (not a general-purpose AI assistant):
 - Intents: BALANCE / INCOME / OUTFLOW / BUDGET / GOALS / WORK / TELECOM / OPPORTUNITIES / TRANSACTIONS / IMPORT / HELP plus SECRET_TARGET_REFUSAL, AMBIGUOUS, CLARIFY_PERIOD, UNSUPPORTED — anything outside the bounded set gets an honest refusal/clarification, never a guess
@@ -93,7 +106,18 @@ Phase 9 → Phase 10 (`MIGRATION_6_7`) is purely additive: `ALTER TABLE transact
 
 ## Testing Status
 
-**Phase 11 Tests: 539 tests PASSING**
+**Phase 12 Tests: 656 tests PASSING**
+- Backup JSON parser/writer (strict integers, duplicate keys, escapes, depth, canonical output) (14 tests)
+- Backup serialization (full roundtrip, exact Longs, nulls/externalRef, archived states, determinism, envelope structure, rejection codes) (16 tests)
+- Backup checksum (SHA-256 vectors, tampering, canonicalization, reordering, algorithm) (13 tests)
+- Backup validation (dangling refs, duplicate/non-positive IDs, enum ranges, month keys, budget slots) (24 tests)
+- Backup restore end-to-end (full replacement, ID/relationship preservation, atomic rollback, preview-no-writes, empty backup, idempotence, no parallel ledger) (16 tests)
+- Backup Secret Target exclusion (JSON/checksum/restore invariance, no model field) (5 tests)
+- Backup file I/O (bounded reader limits, fake SAF layer roundtrip) (7 tests)
+- Backup security boundary (no permissions/network/logging/credentials, SAF-only file access, limits, ignore rules) (9 tests)
+- Backup ViewModel (export/preview/confirm state machine, errors, live info) (13 tests)
+
+**Previous total: Phase 11 Tests: 539 tests PASSING**
 - Intent classifier (intents, periods, priorities, ambiguity, determinism) (23 tests)
 - Assistant time ranges (Kathmandu, ISO weeks, budget months) (12 tests)
 - Assistant engine (responses, labels, limits, Secret Target refusal) (34 tests)

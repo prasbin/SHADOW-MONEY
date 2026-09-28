@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.prasbin.shadowmoney.data.backup.BackupDao
 import com.prasbin.shadowmoney.data.model.Account
 import com.prasbin.shadowmoney.data.model.Budget
 import com.prasbin.shadowmoney.data.model.Category
@@ -31,6 +32,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
     abstract fun workItemDao(): WorkItemDao
     abstract fun telecomDao(): TelecomDao
     abstract fun opportunityDao(): OpportunityDao
+    abstract fun backupDao(): BackupDao
 
     companion object {
         @Volatile
