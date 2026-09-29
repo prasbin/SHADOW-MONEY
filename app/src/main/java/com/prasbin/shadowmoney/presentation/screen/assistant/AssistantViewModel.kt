@@ -10,6 +10,7 @@ import com.prasbin.shadowmoney.assistant.IntentClassifier
 import com.prasbin.shadowmoney.assistant.requiresData
 import com.prasbin.shadowmoney.data.AssistantRepository
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Session-local conversation holder. History is kept only while this
@@ -37,17 +39,20 @@ data class AssistantUiState(
 
 class AssistantViewModel(
     private val repository: AssistantRepository,
-    private val engine: AssistantEngine = AssistantEngine()
+    private val engine: AssistantEngine = AssistantEngine(),
+    dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+    private val sessionGeneration = AtomicInteger(0)
 
     private val _state = MutableStateFlow(AssistantUiState())
     val state: StateFlow<AssistantUiState> = _state
 
-    fun submit(raw: String) {
+    fun submit(raw: String): Boolean {
         val text = raw.trim()
-        if (text.isEmpty() || _state.value.isBusy) return
+        if (text.isEmpty() || _state.value.isBusy) return false
+        val generation = sessionGeneration.get()
         val question: ClassifiedQuestion = IntentClassifier.classify(text)
         _state.update { current ->
             current.copy(
@@ -62,6 +67,7 @@ class AssistantViewModel(
             }.getOrElse {
                 AssistantResponse(listOf(AssistantSection(null, ASSISTANT_READ_ERROR_TEXT)))
             }
+            if (sessionGeneration.get() != generation) return@launch
             _state.update { current ->
                 val messages = (
                     current.messages + AssistantChatMessage(
@@ -73,9 +79,11 @@ class AssistantViewModel(
                 current.copy(messages = messages, isBusy = false)
             }
         }
+        return true
     }
 
     fun clearHistory() {
+        sessionGeneration.incrementAndGet()
         _state.value = AssistantUiState()
     }
 

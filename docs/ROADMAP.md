@@ -1,11 +1,21 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Phase 13 — Real Device Testing / Release ✅ COMPLETE
+## Current Status: Post-Phase 13 Hardening — v1.0 Readiness ✅ COMPLETE
+
+A verification-and-hardening pass (not a new phase — Phases 0–13 remain the complete list, no Phase 14; no architecture/financial-calculation changes, **no schema change — still Room v7**):
+- `versionName = "1.0.0"` set (was `0.1.0-phase2`); `versionCode` stays 2; Settings label renders `BuildConfig.VERSION_NAME`
+- Manual entry implemented end-to-end: Transactions `Add Transaction` dialog (exact Long amounts via `ImportAmount`, Kathmandu dates via `ImportDate`, active account/category/work dropdowns, direction validation, `source = ""` ordinary rows feeding balances/budgets/dashboard/intelligence/backup) and Money accounts screen (create/edit/archive, exact opening balances, per-account balances) — the old Money placeholder screen removed
+- Assistant session hardening: busy submits rejected (no duplicate send), clear-while-busy drops the stale reply (session generation), input clears only on accepted submits
+- Security/release re-review: no backup-content logging, Secret Target exclusion re-confirmed, signing secrets external-only, `.gitignore` + `signing.properties`, no network deps; **encryption at rest documented as a future hardening item**
+- UI review: 8-item bottom nav dense but functional; Jobs bar item documented as an intentionally unwired legacy route (left in place)
+- Verification: **689 tests / 66 suites / 0 failures / 0 errors** (33 new); lint **0 errors / 27 warnings** (+1 = `kotlinx-coroutines-test` newer-version advisory); `assembleDebug`/`assembleRelease` OK; `apksigner verify` → Verifies, v2, CN=Prasbin Dhungana; docs updated, work committed and pushed
+
+Previous phase: Phase 13 — Real Device Testing / Release ✅ COMPLETE
 
 Final phase, executed on an Android 16 (API 36) emulator via ADB (no physical device was available — documented honestly):
 - All 27 phases exercised end-to-end on-device (navigation, financial core, intelligence, budgets, work, goals + Secret Target, telecom, opportunities, CSV import, assistant, backup/restore/export)
 - Verified blockers fixed (no new features, no schema change — still v7): dead Money/Settings bottom-bar wiring, Money placeholder → Transactions route, Settings version label → `BuildConfig.VERSION_NAME`
-- Release APK signed with an external keystore (outside the repo), `apksigner verify` → Verifies (v2 scheme), versionCode 2 / versionName 0.1.0-phase2
+- Release APK signed with an external keystore (outside the repo), `apksigner verify` → Verifies (v2 scheme), versionCode 2 / versionName 1.0.0
 - Secret Target device-tested: set/mask/reveal/edit/clear, absent from Dashboard, assistant and exports, survives relaunch
 - Tampered backup rejected on-device with existing data unchanged; export/restore checksum round-trip verified
 - Permissions: 4 install-time (library-merged), 0 runtime, no INTERNET; no network APIs/deps in the codebase

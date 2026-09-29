@@ -4,11 +4,19 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
+**Post-Phase 13 Hardening — v1.0 Readiness** ✅ COMPLETE (a hardening pass, not a new phase; Phases 0–13 remain the complete list):
+- Version set to `versionName = "1.0.0"` (`versionCode` stays 2); the Settings label keeps rendering `BuildConfig.VERSION_NAME`
+- Manual entry implemented: the Transactions screen now has a working Add Transaction dialog (exact Long minor-unit amounts, Kathmandu-ISO dates, active account/category/work-item dropdowns, direction validation, `source = ""` ordinary rows), and the Money screen manages accounts (create/edit/archive with exact opening balances) — the old "Not Implemented Yet" Money placeholder screen was removed
+- Assistant session hardening: busy submits rejected without duplicating the session, clear-while-busy drops the stale late reply, input clears only on accepted sends (regression-tested with a deterministic test dispatcher)
+- Security/release re-review: no backup-content logging, Secret Target still absent from exports, signing secrets external-only (`.gitignore` also covers `signing.properties`), no network/analytics dependencies; backup **encryption at rest remains a documented future hardening item** (plain JSON by design)
+- UI notes (documented, not silently changed): 8-item bottom navigation is dense but works; the Jobs bar item is an intentionally unwired legacy route superseded by Work
+- Verification: **689 tests / 66 suites / 0 failures / 0 errors** (33 new); lint **0 errors / 27 warnings** (+1 = newer-version advisory on the added `kotlinx-coroutines-test` test dependency); `assembleDebug` + `assembleRelease` OK; `apksigner verify` → Verifies, v2 scheme, CN=Prasbin Dhungana
+
 **Phase 13 — Real Device Testing / Release Verification** ✅ COMPLETE
 
 Final verification phase: everything below was exercised end-to-end on a real Android runtime (Android 16 / API 36 emulator, ADB-driven UI exploration with `uiautomator dump`), verified blockers fixed, release build signed and signature-verified (no new features, no schema change, still Room v7):
 - Environment: Android 16 (API 36, x86_64) emulator device — **no physical device was available** (honest limitation, documented); app package `com.prasbin.shadowmoney.debug` installed, cold/warm launched and exercised entirely on-device
-- Verified-blocker fixes (all pre-existing, found by device testing): dead Money and Settings bottom-bar items were wired to their routes; the Money placeholder gained a "View Transactions" route to the otherwise-unreachable Transactions hub; the Settings version label now reads `BuildConfig.VERSION_NAME` (`SHADOW MONEY v0.1.0-phase2`) instead of a hardcoded `v0.1.0-phase1`
+- Verified-blocker fixes (all pre-existing, found by device testing): dead Money and Settings bottom-bar items were wired to their routes; the Money placeholder gained a "View Transactions" route to the otherwise-unreachable Transactions hub; the Settings version label now reads `BuildConfig.VERSION_NAME` instead of a hardcoded string
 - Navigation: all 13 registered routes reachable and alive (Dashboard, Goals, Budgets, Work, Telecom, Opps, Money, Transactions, Import, Assistant, Settings, Backup & Restore)
 - Financial core on-device: dashboard balance/income/outflow/category math exact against the synthetic fixture (NPR 1,260.00 / 800.00 / 540.00), goal progress account-linked, budget states including OVER_BUDGET with the "not additional money" note, work Expected/Received/Remaining correct, telecom and opportunity amounts never entering financial totals
 - Intelligence: FACT / CALCULATION / ANALYSIS / PROJECTION labels correct, empty state ("No financial records yet") observed, projections carry disclaimers, no fabricated insights
@@ -17,7 +25,7 @@ Final verification phase: everything below was exercised end-to-end on a real An
 - Backup/restore on-device: deterministic export with checksum, full restore with the verbatim destructive warning and exact counts, tampered file rejected ("The backup checksum does not match; the file was modified or damaged") with existing data untouched
 - Secret Target on-device: set → masked bullets by default → reveal → edit (pre-filled) → clear (confirmation dialog), value absent from Dashboard, assistant and the exported JSON (re-scanned while the value was set), survives force-stop/relaunch
 - Persistence: force-stop + relaunch preserves all 19 records and every screen's data; assistant conversation does not persist (session-only, by design)
-- Release: signed `app-release.apk` (external keystore + properties file outside the repo, never logged/committed), `apksigner verify` → Verifies, v2 scheme true, signer CN=Prasbin Dhungana, versionCode 2 / versionName 0.1.0-phase2
+- Release: signed `app-release.apk` (external keystore + properties file outside the repo, never logged/committed), `apksigner verify` → Verifies, v2 scheme true, signer CN=Prasbin Dhungana, versionCode 2 / versionName 1.0.0
 - Permissions: 4 install-time library-merged permissions (FOREGROUND_SERVICE, RECEIVE_BOOT_COMPLETED, ACCESS_NETWORK_STATE, WAKE_LOCK), 0 runtime permissions, no INTERNET, 0 network APIs in source and 0 network dependencies; logcat from the app PID shows no network activity
 - Security: tracked-file scan clean (no keystore/APK/backup/CSV artifacts), diff reviewed, `.gitignore` covers `*.apk`/`*.jks`/`*.keystore`
 - Tests: **656 passing / 63 suites / 0 failures / 0 errors**; lint **0 errors, 26 warnings** (unchanged baseline)

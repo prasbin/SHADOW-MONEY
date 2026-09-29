@@ -108,10 +108,11 @@ fun AssistantScreen(navController: NavHostController) {
 
     fun send() {
         val text = input
-        if (text.isBlank() || state.isBusy) return
-        viewModel.submit(text)
-        input = ""
-        keyboard?.hide()
+        if (text.isBlank()) return
+        if (viewModel.submit(text)) {
+            input = ""
+            keyboard?.hide()
+        }
     }
 
     Scaffold(

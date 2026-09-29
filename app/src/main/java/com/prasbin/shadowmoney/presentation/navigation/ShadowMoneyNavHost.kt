@@ -9,9 +9,9 @@ import com.prasbin.shadowmoney.presentation.screen.assistant.AssistantScreen
 import com.prasbin.shadowmoney.presentation.screen.budgets.BudgetsScreen
 import com.prasbin.shadowmoney.presentation.screen.csvimport.ImportTransactionsScreen
 import com.prasbin.shadowmoney.presentation.screen.dashboard.DashboardScreen
-import com.prasbin.shadowmoney.presentation.screen.dashboard.MoneyPlaceholderScreen
 import com.prasbin.shadowmoney.presentation.screen.goals.GoalsScreen
 import com.prasbin.shadowmoney.presentation.screen.jobs.JobsScreen
+import com.prasbin.shadowmoney.presentation.screen.money.MoneyScreen
 import com.prasbin.shadowmoney.presentation.screen.opportunities.OpportunitiesScreen
 import com.prasbin.shadowmoney.presentation.screen.settings.SettingsScreen
 import com.prasbin.shadowmoney.presentation.screen.telecom.TelecomScreen
@@ -48,7 +48,7 @@ fun ShadowMoneyNavHost(
             TransactionsScreen(navController = navController)
         }
         composable(Screen.Money.route) {
-            MoneyPlaceholderScreen(navController = navController)
+            MoneyScreen(navController = navController)
         }
         composable(Screen.Import.route) {
             ImportTransactionsScreen(navController = navController)

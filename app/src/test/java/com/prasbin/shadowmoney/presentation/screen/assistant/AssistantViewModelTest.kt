@@ -21,6 +21,9 @@ import com.prasbin.shadowmoney.data.model.TRANSACTION_DIRECTION_INCOME
 import com.prasbin.shadowmoney.data.model.Transaction
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -235,5 +238,78 @@ class AssistantViewModelTest {
         assertEquals(accountsBefore, database.accountDao().getAll().first())
         assertEquals(transactionsBefore, database.transactionDao().getAll().first())
         assertEquals(goalsBefore, database.goalDao().observeAll().first())
+    }
+
+    private fun awaitSettled(
+        vm: AssistantViewModel,
+        minMessages: Int,
+        scheduler: TestCoroutineScheduler
+    ) {
+        val deadline = System.currentTimeMillis() + 10_000
+        while (System.currentTimeMillis() < deadline) {
+            scheduler.advanceUntilIdle()
+            val state = vm.state.value
+            if (!state.isBusy && state.messages.size >= minMessages) return
+            Thread.sleep(5)
+        }
+        val state = vm.state.value
+        throw AssertionError(
+            "assistant session did not settle: isBusy=${state.isBusy}, " +
+                "messages=${state.messages.size}, expected at least $minMessages"
+        )
+    }
+
+    @Test
+    fun submit_whileBusy_isRejectedWithoutDuplicatingSession() {
+        val dispatcher = StandardTestDispatcher()
+        val vm = AssistantViewModel(repository, dispatcher = dispatcher)
+        runTest(dispatcher) {
+            assertTrue(vm.submit("what is my balance"))
+            assertTrue("submit must mark the session busy synchronously", vm.state.value.isBusy)
+
+            assertFalse(
+                "a second submit while busy must be rejected",
+                vm.submit("what did i spend this month")
+            )
+            assertEquals("no duplicate user message may be recorded", 1, vm.state.value.messages.size)
+
+            awaitSettled(vm, minMessages = 2, scheduler = testScheduler)
+
+            val state = vm.state.value
+            assertFalse(state.isBusy)
+            assertEquals("only one exchange may exist after the race", 2, state.messages.size)
+            assertTrue(state.messages[0].isUser)
+            assertEquals("what is my balance", state.messages[0].text)
+            assertFalse(state.messages[1].isUser)
+            assertTrue(state.messages[1].sections.isNotEmpty())
+        }
+    }
+
+    @Test
+    fun clearHistory_whileBusy_dropsStaleReplyAndAcceptsNextQuestion() {
+        val dispatcher = StandardTestDispatcher()
+        val vm = AssistantViewModel(repository, dispatcher = dispatcher)
+        runTest(dispatcher) {
+            assertTrue(vm.submit("what is my balance"))
+
+            vm.clearHistory()
+            assertTrue(vm.state.value.messages.isEmpty())
+            assertFalse(vm.state.value.isBusy)
+
+            assertTrue(vm.submit("help"))
+
+            awaitSettled(vm, minMessages = 2, scheduler = testScheduler)
+
+            val state = vm.state.value
+            assertFalse(state.isBusy)
+            assertEquals(
+                "stale reply from before clearHistory must be dropped; only 'help' exchange may remain",
+                2,
+                state.messages.size
+            )
+            assertTrue(state.messages[0].isUser)
+            assertEquals("help", state.messages[0].text)
+            assertFalse(state.messages[1].isUser)
+        }
     }
 }

@@ -31,3 +31,4 @@ local.properties
 
 # Room schema export (ksp schemaLocation resolves under app/)
 app/app/
+signing.properties
