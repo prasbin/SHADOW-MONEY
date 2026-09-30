@@ -48,6 +48,7 @@ data class DashboardData(
     val recentTransactions: List<RecentTransactionView>,
     val categoryOutflow: List<CategorySpendView>,
     val goals: List<GoalProgressView>,
+    val overallBudget: BudgetView?,
     val isEmpty: Boolean
 )
 
@@ -56,6 +57,7 @@ class DashboardRepository(
     private val categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
     private val goalDao: GoalDao,
+    private val budgetRepository: BudgetRepository,
     private val openHelper: SupportSQLiteOpenHelper
 ) {
 
@@ -63,8 +65,9 @@ class DashboardRepository(
         accountDao.getAll(),
         transactionDao.observeTransactionCount(),
         categoryDao.getAll(),
-        goalDao.getAllActive()
-    ) { accounts, _, categories, goals ->
+        goalDao.getAllActive(),
+        budgetRepository.observeChanges()
+    ) { accounts, _, categories, goals, _ ->
         DashboardSnapshot(accounts, categories, goals)
     }
 
@@ -116,6 +119,10 @@ class DashboardRepository(
             GoalProgressView(goal = goal, savedMinor = saved, progressPercent = percent)
         }
 
+        val overallBudget = budgetRepository
+            .loadMonthData(BudgetCalendar.currentMonthKey())
+            .overall
+
         return DashboardData(
             totalBalanceMinor = totalBalance,
             totalIncomeMinor = totalIncome,
@@ -124,6 +131,7 @@ class DashboardRepository(
             recentTransactions = recentViews,
             categoryOutflow = categoryOutflow,
             goals = goalViews,
+            overallBudget = overallBudget,
             isEmpty = snapshot.accounts.isEmpty() && recent.isEmpty() && snapshot.goals.isEmpty()
         )
     }

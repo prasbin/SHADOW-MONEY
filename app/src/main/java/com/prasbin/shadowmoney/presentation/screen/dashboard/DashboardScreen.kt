@@ -76,6 +76,12 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController? = null
                         categoryDao = database.categoryDao(),
                         transactionDao = database.transactionDao(),
                         goalDao = database.goalDao(),
+                        budgetRepository = com.prasbin.shadowmoney.data.BudgetRepository(
+                            budgetDao = database.budgetDao(),
+                            transactionDao = database.transactionDao(),
+                            categoryDao = database.categoryDao(),
+                            openHelper = database.openHelper
+                        ),
                         openHelper = database.openHelper
                     )
                 ) as T
@@ -304,6 +310,70 @@ private fun QuickActions(
     }
 }
 
+// ---- BUDGET ------------------------------------------------------------------
+
+@Composable
+private fun BudgetSection(
+    budget: com.prasbin.shadowmoney.data.BudgetView?,
+    navController: androidx.navigation.NavHostController?
+) {
+    if (budget == null) {
+        SystemEmptyState(
+            title = "No monthly budget",
+            message = "Set a monthly budget to track spending against a limit.",
+            actionLabel = "Set budget",
+            onAction = { navController?.navigate(Screen.Budgets.route) }
+        )
+        return
+    }
+    val statusColor = budgetStatusColor(budget.status)
+    SystemPanel(title = "Budget") {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Overall monthly budget",
+                style = MaterialTheme.typography.bodyMedium,
+                color = DarkOnSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            SystemChip(text = budgetStatusLabel(budget.status), color = statusColor)
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            SystemMetric(
+                label = "Spent",
+                value = Money.formatNpr(budget.spentMinor),
+                valueColor = NeonPurple,
+                modifier = Modifier.weight(1f)
+            )
+            SystemMetric(
+                label = "Budget",
+                value = Money.formatNpr(budget.budget.amountMinor),
+                valueColor = NeonCyan,
+                modifier = Modifier.weight(1f)
+            )
+            SystemMetric(
+                label = "Remaining",
+                value = Money.formatNpr(budget.remainingMinor),
+                valueColor = if (budget.remainingMinor >= 0L) NeonGreen else ErrorRed,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        LinearProgressIndicator(
+            progress = { (budget.percentUsed / 100f).coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp),
+            color = statusColor,
+            trackColor = BorderColor,
+            strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+        )
+    }
+}
+
 // ---- EMPTY / CONTENT ---------------------------------------------------------
 
 @Composable
@@ -351,6 +421,13 @@ private fun DashboardContent(
             )
         }
         item { QuickActions(hasAccounts = state.accounts.isNotEmpty(), navController = navController) }
+
+        item {
+            BudgetSection(
+                budget = state.overallBudget,
+                navController = navController
+            )
+        }
 
         item {
             SystemPanel(

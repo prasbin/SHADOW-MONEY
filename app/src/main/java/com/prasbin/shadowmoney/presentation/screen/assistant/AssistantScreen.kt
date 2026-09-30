@@ -62,6 +62,12 @@ fun AssistantScreen(navController: NavHostController) {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 val database = ShadowMoneyDatabase.getInstance(context.applicationContext)
+                val budgetRepository = BudgetRepository(
+                    budgetDao = database.budgetDao(),
+                    transactionDao = database.transactionDao(),
+                    categoryDao = database.categoryDao(),
+                    openHelper = database.openHelper
+                )
                 return AssistantViewModel(
                     repository = AssistantRepository(
                         dashboardRepository = DashboardRepository(
@@ -69,14 +75,10 @@ fun AssistantScreen(navController: NavHostController) {
                             categoryDao = database.categoryDao(),
                             transactionDao = database.transactionDao(),
                             goalDao = database.goalDao(),
+                            budgetRepository = budgetRepository,
                             openHelper = database.openHelper
                         ),
-                        budgetRepository = BudgetRepository(
-                            budgetDao = database.budgetDao(),
-                            transactionDao = database.transactionDao(),
-                            categoryDao = database.categoryDao(),
-                            openHelper = database.openHelper
-                        ),
+                        budgetRepository = budgetRepository,
                         goalRepository = GoalRepository(
                             goalDao = database.goalDao(),
                             accountDao = database.accountDao(),

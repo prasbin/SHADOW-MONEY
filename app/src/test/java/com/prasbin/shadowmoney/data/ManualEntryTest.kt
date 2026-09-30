@@ -77,6 +77,7 @@ class ManualEntryTest {
             categoryDao = categoryDao,
             transactionDao = transactionDao,
             goalDao = goalDao,
+            budgetRepository = budgetRepository,
             openHelper = database.openHelper
         )
     }

@@ -2,6 +2,7 @@ package com.prasbin.shadowmoney.presentation.screen.dashboard
 
 import androidx.lifecycle.ViewModel
 import com.prasbin.shadowmoney.data.AccountBalanceView
+import com.prasbin.shadowmoney.data.BudgetView
 import com.prasbin.shadowmoney.data.CategorySpendView
 import com.prasbin.shadowmoney.data.DashboardRepository
 import com.prasbin.shadowmoney.data.GoalProgressView
@@ -28,7 +29,8 @@ sealed interface DashboardUiState {
         val accounts: List<AccountBalanceView>,
         val recentTransactions: List<RecentTransactionView>,
         val categoryOutflow: List<CategorySpendView>,
-        val goals: List<GoalProgressView>
+        val goals: List<GoalProgressView>,
+        val overallBudget: BudgetView?
     ) : DashboardUiState
 
     data class Error(val message: String) : DashboardUiState
@@ -55,7 +57,8 @@ class DashboardViewModel(
                                 accounts = data.accounts,
                                 recentTransactions = data.recentTransactions,
                                 categoryOutflow = data.categoryOutflow,
-                                goals = data.goals
+                                goals = data.goals,
+                                overallBudget = data.overallBudget
                             )
                         }
                     },

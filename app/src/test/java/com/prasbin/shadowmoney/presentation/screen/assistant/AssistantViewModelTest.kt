@@ -85,7 +85,7 @@ class AssistantViewModelTest {
         val accDao = db.accountDao()
         val gDao = db.goalDao()
         return AssistantRepository(
-            dashboardRepository = DashboardRepository(accDao, catDao, txDao, gDao, db.openHelper),
+            dashboardRepository = DashboardRepository(accDao, catDao, txDao, gDao, BudgetRepository(db.budgetDao(), txDao, catDao, db.openHelper), db.openHelper),
             budgetRepository = BudgetRepository(db.budgetDao(), txDao, catDao, db.openHelper),
             goalRepository = GoalRepository(gDao, accDao, txDao),
             workRepository = WorkRepository(db.workItemDao(), txDao, db.openHelper, clock = { now }),

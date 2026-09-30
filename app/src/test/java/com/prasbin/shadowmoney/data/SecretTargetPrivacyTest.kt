@@ -55,8 +55,8 @@ class SecretTargetPrivacyTest {
         accountDao = database.accountDao()
         transactionDao = database.transactionDao()
         goalRepository = GoalRepository(goalDao, accountDao, transactionDao)
-        dashboardRepository = DashboardRepository(accountDao, categoryDao(), transactionDao, goalDao, database.openHelper)
         budgetRepository = BudgetRepository(database.budgetDao(), transactionDao, categoryDao(), database.openHelper)
+        dashboardRepository = DashboardRepository(accountDao, categoryDao(), transactionDao, goalDao, budgetRepository, database.openHelper)
         workRepository = WorkRepository(database.workItemDao(), transactionDao, database.openHelper)
         secretStore = SecretTargetStore(dataStore)
     }
@@ -105,17 +105,13 @@ class SecretTargetPrivacyTest {
         )
 
         val before = dashboardRepository.loadDashboardData(
-            DashboardRepository(
-                accountDao, categoryDao(), transactionDao, goalDao, database.openHelper
-            ).observeSnapshot().first()
+            dashboardRepository.observeSnapshot().first()
         )
 
         secretStore.setTarget(secretValue)
 
         val after = dashboardRepository.loadDashboardData(
-            DashboardRepository(
-                accountDao, categoryDao(), transactionDao, goalDao, database.openHelper
-            ).observeSnapshot().first()
+            dashboardRepository.observeSnapshot().first()
         )
 
         assertEquals(before.totalBalanceMinor, after.totalBalanceMinor)

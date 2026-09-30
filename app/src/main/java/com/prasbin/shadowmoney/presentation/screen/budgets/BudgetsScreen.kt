@@ -49,18 +49,6 @@ internal fun parseNprToMinor(input: String): Long? {
     return whole * 100L + fraction
 }
 
-private fun statusLabel(status: com.prasbin.shadowmoney.data.BudgetStatus): String = when (status) {
-    com.prasbin.shadowmoney.data.BudgetStatus.NORMAL -> "Under budget"
-    com.prasbin.shadowmoney.data.BudgetStatus.APPROACHING -> "Approaching limit"
-    com.prasbin.shadowmoney.data.BudgetStatus.OVER_BUDGET -> "Over budget"
-}
-
-private fun statusColor(status: com.prasbin.shadowmoney.data.BudgetStatus): androidx.compose.ui.graphics.Color = when (status) {
-    com.prasbin.shadowmoney.data.BudgetStatus.NORMAL -> NeonGreen
-    com.prasbin.shadowmoney.data.BudgetStatus.APPROACHING -> WarningAmber
-    com.prasbin.shadowmoney.data.BudgetStatus.OVER_BUDGET -> ErrorRed
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetsScreen() {
@@ -364,10 +352,10 @@ private fun BudgetRow(
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = statusLabel(view.status),
+                text = budgetStatusLabel(view.status),
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
-                color = statusColor(view.status),
+            color = budgetStatusColor(view.status),
                 fontWeight = FontWeight.Bold
             )
             IconButton(
@@ -408,7 +396,7 @@ private fun BudgetRow(
         LinearProgressIndicator(
             progress = { (view.percentUsed / 100f).coerceIn(0f, 1f) },
             modifier = Modifier.fillMaxWidth(),
-            color = statusColor(view.status),
+                color = budgetStatusColor(view.status),
             trackColor = BorderColor
         )
     }

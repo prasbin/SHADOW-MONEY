@@ -30,6 +30,7 @@ class DashboardViewModelTest {
     private lateinit var categoryDao: CategoryDao
     private lateinit var transactionDao: TransactionDao
     private lateinit var goalDao: GoalDao
+    private lateinit var budgetDao: BudgetDao
 
     @Before
     fun createDb() {
@@ -43,6 +44,7 @@ class DashboardViewModelTest {
         categoryDao = database.categoryDao()
         transactionDao = database.transactionDao()
         goalDao = database.goalDao()
+        budgetDao = database.budgetDao()
     }
 
     @After
@@ -63,6 +65,9 @@ class DashboardViewModelTest {
         ).get(DashboardViewModel::class.java)
     }
 
+    private fun budgetRepository(dao: TransactionDao): BudgetRepository =
+        BudgetRepository(budgetDao, dao, categoryDao, database.openHelper)
+
     private fun defaultViewModel(): DashboardViewModel =
         viewModelWith(
             DashboardRepository(
@@ -70,6 +75,7 @@ class DashboardViewModelTest {
                 categoryDao,
                 transactionDao,
                 goalDao,
+                budgetRepository(transactionDao),
                 database.openHelper
             )
         )
@@ -299,6 +305,12 @@ class DashboardViewModelTest {
                 throw RuntimeException("Simulated database failure")
             override suspend fun getOutflowTotalForPeriod(start: Long, end: Long): Long =
                 throw RuntimeException("Simulated database failure")
+            override suspend fun getIncomeTotalForPeriod(start: Long, end: Long): Long =
+                throw RuntimeException("Simulated database failure")
+            override suspend fun getCountInPeriod(start: Long, end: Long): Int =
+                throw RuntimeException("Simulated database failure")
+            override suspend fun getCountInPeriodByDirection(start: Long, end: Long, direction: Int): Int =
+                throw RuntimeException("Simulated database failure")
             override suspend fun getOutflowTotalForCategoryPeriod(categoryId: Long, start: Long, end: Long): Long =
                 throw RuntimeException("Simulated database failure")
             override fun observeReceivedForWorkItem(workItemId: Long): Flow<Long> =
@@ -317,6 +329,7 @@ class DashboardViewModelTest {
                 categoryDao,
                 failingDao,
                 goalDao,
+                budgetRepository(failingDao),
                 database.openHelper
             )
         )
@@ -372,5 +385,142 @@ class DashboardViewModelTest {
         assertEquals("My Bank", row.accountName)
         assertEquals("Salary", row.categoryName)
         assertEquals("Monthly salary", row.transaction.note)
+    }
+
+    private fun currentMonthKey(): String = BudgetCalendar.currentMonthKey()
+
+    @Test
+    fun noBudget_reportsNullOverallBudget_notFakeZeroBudget() = runBlocking {
+        accountDao.insert(
+            Account(name = "Wallet", type = ACCOUNT_TYPE_WALLET, openingBalanceMinor = 0L)
+        )
+
+        val viewModel = defaultViewModel()
+        val state = awaitState(viewModel) { it is DashboardUiState.Content } as DashboardUiState.Content
+
+        assertNull(state.overallBudget)
+    }
+
+    @Test
+    fun budgetWithNoSpending_spentZero_remainingEqualsBudget() = runBlocking {
+        accountDao.insert(
+            Account(name = "Wallet", type = ACCOUNT_TYPE_WALLET, openingBalanceMinor = 0L)
+        )
+        budgetRepository(transactionDao).createOverallBudget(currentMonthKey(), 50_000L)
+
+        val viewModel = defaultViewModel()
+        val state = awaitState(viewModel) {
+            it is DashboardUiState.Content && it.overallBudget != null
+        } as DashboardUiState.Content
+
+        val budget = state.overallBudget!!
+        assertEquals(50_000L, budget.budget.amountMinor)
+        assertEquals(0L, budget.spentMinor)
+        assertEquals(50_000L, budget.remainingMinor)
+        assertEquals(0, budget.percentUsed)
+        assertEquals(BudgetStatus.NORMAL, budget.status)
+    }
+
+    @Test
+    fun budgetCountsOutflowOnly_withinCurrentMonth() = runBlocking {
+        val accountId = accountDao.insert(
+            Account(name = "Wallet", type = ACCOUNT_TYPE_WALLET, openingBalanceMinor = 0L)
+        )
+        budgetRepository(transactionDao).createOverallBudget(currentMonthKey(), 10_000L)
+        transactionDao.insertAll(
+            listOf(
+                Transaction(accountId = accountId, amountMinor = 3_000L, direction = TRANSACTION_DIRECTION_OUTFLOW),
+                Transaction(accountId = accountId, amountMinor = 8_000L, direction = TRANSACTION_DIRECTION_INCOME)
+            )
+        )
+
+        val viewModel = defaultViewModel()
+        val state = awaitState(viewModel) {
+            it is DashboardUiState.Content && it.overallBudget?.spentMinor == 3_000L
+        } as DashboardUiState.Content
+
+        val budget = state.overallBudget!!
+        assertEquals(3_000L, budget.spentMinor)
+        assertEquals(7_000L, budget.remainingMinor)
+        assertEquals(30, budget.percentUsed)
+        assertEquals(BudgetStatus.NORMAL, budget.status)
+        assertEquals(8_000L, state.totalIncomeMinor)
+    }
+
+    @Test
+    fun income_alone_neverCountsAsBudgetSpending() = runBlocking {
+        val accountId = accountDao.insert(
+            Account(name = "Wallet", type = ACCOUNT_TYPE_WALLET, openingBalanceMinor = 0L)
+        )
+        budgetRepository(transactionDao).createOverallBudget(currentMonthKey(), 10_000L)
+        transactionDao.insert(
+            Transaction(accountId = accountId, amountMinor = 90_000L, direction = TRANSACTION_DIRECTION_INCOME)
+        )
+
+        val viewModel = defaultViewModel()
+        val state = awaitState(viewModel) {
+            it is DashboardUiState.Content && it.overallBudget != null && it.totalIncomeMinor == 90_000L
+        } as DashboardUiState.Content
+
+        val budget = state.overallBudget!!
+        assertEquals(0L, budget.spentMinor)
+        assertEquals(10_000L, budget.remainingMinor)
+        assertEquals(0, budget.percentUsed)
+        assertEquals(BudgetStatus.NORMAL, budget.status)
+    }
+
+    @Test
+    fun overBudget_statusAndNegativeRemainingPreserved() = runBlocking {
+        val accountId = accountDao.insert(
+            Account(name = "Wallet", type = ACCOUNT_TYPE_WALLET, openingBalanceMinor = 0L)
+        )
+        budgetRepository(transactionDao).createOverallBudget(currentMonthKey(), 1_000L)
+        transactionDao.insert(
+            Transaction(accountId = accountId, amountMinor = 1_500L, direction = TRANSACTION_DIRECTION_OUTFLOW)
+        )
+
+        val viewModel = defaultViewModel()
+        val state = awaitState(viewModel) {
+            it is DashboardUiState.Content && it.overallBudget?.status == BudgetStatus.OVER_BUDGET
+        } as DashboardUiState.Content
+
+        val budget = state.overallBudget!!
+        assertEquals(1_500L, budget.spentMinor)
+        assertEquals(-500L, budget.remainingMinor)
+        assertEquals(150, budget.percentUsed)
+        assertEquals(BudgetStatus.OVER_BUDGET, budget.status)
+    }
+
+    @Test
+    fun lastMonthBudget_notReportedAsCurrentBudget() = runBlocking {
+        accountDao.insert(
+            Account(name = "Wallet", type = ACCOUNT_TYPE_WALLET, openingBalanceMinor = 0L)
+        )
+        budgetRepository(transactionDao).createOverallBudget(
+            BudgetCalendar.shiftMonth(currentMonthKey(), -1),
+            100_000L
+        )
+
+        val viewModel = defaultViewModel()
+        val state = awaitState(viewModel) { it is DashboardUiState.Content } as DashboardUiState.Content
+
+        assertNull(state.overallBudget)
+    }
+
+    @Test
+    fun budgetCreation_reactivelyUpdatesDashboardState() = runBlocking {
+        accountDao.insert(
+            Account(name = "Wallet", type = ACCOUNT_TYPE_WALLET, openingBalanceMinor = 1_000L)
+        )
+        val viewModel = defaultViewModel()
+        awaitState(viewModel) { it is DashboardUiState.Content && it.overallBudget == null }
+
+        budgetRepository(transactionDao).createOverallBudget(currentMonthKey(), 25_000L)
+
+        val updated = awaitState(viewModel) {
+            it is DashboardUiState.Content && it.overallBudget != null
+        } as DashboardUiState.Content
+        assertEquals(25_000L, updated.overallBudget?.budget?.amountMinor)
+        assertEquals(25_000L, updated.overallBudget?.remainingMinor)
     }
 }
