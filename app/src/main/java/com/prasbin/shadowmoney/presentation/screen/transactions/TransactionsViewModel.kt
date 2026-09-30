@@ -89,6 +89,11 @@ class TransactionsViewModel(
         }
     }
 
+    override fun onCleared() {
+        scope.cancel()
+        super.onCleared()
+    }
+
     fun clearError() {
         _errorMessage.value = null
     }

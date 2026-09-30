@@ -4,6 +4,11 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
+**v1.0 Release Candidate Audit** ✅ COMPLETE (an audit pass, not a new phase; Phases 0–13 remain the complete list):
+- Read-only audit of product, financial integrity, security, database, UI/UX, release config, performance, tests and documentation against baseline `7651f07`; one release blocker found and fixed: `MoneyViewModel` and `TransactionsViewModel` created private `CoroutineScope`s without overriding `onCleared`, leaking Room Flow collectors after navigation — both now cancel their scope like every other ViewModel, each guarded by a `ViewModelStore.clear()` regression test
+- Release APK (`com.prasbin.shadowmoney`, v1.0.0) installed and exercised on a **physical Android 16 device (24094RAD4G)** — first install, first-launch empty state, Goals/Secret-Target empty state, crash-free; full route-walk of the release APK completed on the Android 16 emulator (all 8 bottom-nav screens, Transactions, Assistant, Add Account dialog open/cancel, Settings `SHADOW MONEY v1.0.0`, zero logcat crashes)
+- Verification: **691 tests / 66 suites / 0 failures / 0 errors** (2 new scope-cancellation regressions); lint **0 errors / 27 warnings**; `assembleDebug` + `assembleRelease` OK; `apksigner verify` → Verifies, v2 scheme, CN=Prasbin Dhungana
+
 **Post-Phase 13 Hardening — v1.0 Readiness** ✅ COMPLETE (a hardening pass, not a new phase; Phases 0–13 remain the complete list):
 - Version set to `versionName = "1.0.0"` (`versionCode` stays 2); the Settings label keeps rendering `BuildConfig.VERSION_NAME`
 - Manual entry implemented: the Transactions screen now has a working Add Transaction dialog (exact Long minor-unit amounts, Kathmandu-ISO dates, active account/category/work-item dropdowns, direction validation, `source = ""` ordinary rows), and the Money screen manages accounts (create/edit/archive with exact opening balances) — the old "Not Implemented Yet" Money placeholder screen was removed

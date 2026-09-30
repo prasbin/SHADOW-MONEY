@@ -1,6 +1,13 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Post-Phase 13 Hardening — v1.0 Readiness ✅ COMPLETE
+## Current Status: v1.0 Release Candidate Audit ✅ COMPLETE
+
+An audit pass (not a new phase — Phases 0–13 remain the complete list, no Phase 14; no architecture/financial-calculation changes, **no schema change — still Room v7**), baseline `7651f07`:
+- Full audit across product / financial integrity / security / database / UI / release / performance / tests / docs; one release blocker found and fixed: `MoneyViewModel` and `TransactionsViewModel` lacked `onCleared()` scope cancellation (leaked Room Flow collectors) — fixed with `ViewModelStore.clear()` regression tests
+- Release APK installed and exercised on a **physical Android 16 device (24094RAD4G)** (first install, first-launch empty state, Goals empty state, crash-free) plus a full release-APK route-walk on the Android 16 emulator (all empty states, Add Account dialog, Transactions, Assistant, Settings `v1.0.0`, zero logcat crashes)
+- Verification: **691 tests / 66 suites / 0 failures / 0 errors** (+2 scope-cancellation tests); lint **0 errors / 27 warnings**; `assembleDebug`/`assembleRelease` OK; `apksigner verify` → Verifies, v2, CN=Prasbin Dhungana; docs updated, work committed and pushed
+
+Previous status: Post-Phase 13 Hardening — v1.0 Readiness ✅ COMPLETE
 
 A verification-and-hardening pass (not a new phase — Phases 0–13 remain the complete list, no Phase 14; no architecture/financial-calculation changes, **no schema change — still Room v7**):
 - `versionName = "1.0.0"` set (was `0.1.0-phase2`); `versionCode` stays 2; Settings label renders `BuildConfig.VERSION_NAME`

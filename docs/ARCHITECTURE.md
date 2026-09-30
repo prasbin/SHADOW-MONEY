@@ -336,6 +336,13 @@ A verification-and-hardening pass (not a new phase; Phases 0-13 remain the compl
 - **UI notes (documented, not "fixed")**: the Dashboard bottom navigation carries 8 items - dense but functional on-device; the Jobs bar item is an intentionally unwired legacy route superseded by the Work screen (Phase 6) and was left in place, not removed.
 - **Verification**: 689 tests / 66 suites / 0 failures / 0 errors (33 new tests: `ManualEntryTest`, `MoneyViewModelTest`, `TransactionsViewModelTest`, assistant busy/generation regression); lint 0 errors / 27 warnings (the +1 warning is a newer-version advisory on the newly added `kotlinx-coroutines-test` dependency); `assembleDebug` + `assembleRelease` successful.
 
+## v1.0 Release Candidate Audit
+
+An audit pass (not a new phase; no architecture/financial-calculation change, **no schema change - still Room v7**), baseline `7651f07`:
+- **Blocker found and fixed**: `MoneyViewModel` and `TransactionsViewModel` created private `CoroutineScope(SupervisorJob() + Dispatchers.Default)` for Room Flow collection but never overrode `onCleared()`, so collectors leaked every time the screen was destroyed - both now call `scope.cancel()` in `onCleared()` (the pattern already used by the other 11 ViewModels), each guarded by a `viewModelScope_isCancelledAfterViewModelStoreClear` regression test using `ViewModelStore.put`/`clear`.
+- **On-device**: release APK (`com.prasbin.shadowmoney`, v1.0.0) first-installed and exercised on a physical Android 16 device (24094RAD4G): first-launch empty state, Goals/Secret-Target empty state, crash-free; full release-APK route-walk on the Android 16 emulator covering all 8 bottom-nav screens, Transactions, Assistant, Add Account dialog open/cancel and the Settings `SHADOW MONEY v1.0.0` label, with zero logcat crashes.
+- **Verification**: 691 tests / 66 suites / 0 failures / 0 errors (+2 scope-cancellation regressions); lint 0 errors / 27 warnings; `assembleDebug` + `assembleRelease` successful; `apksigner verify` -> Verifies, v2 scheme, CN=Prasbin Dhungana.
+
 ### Dependencies
 
 Same versions as SHADOW LEARN project for consistency:

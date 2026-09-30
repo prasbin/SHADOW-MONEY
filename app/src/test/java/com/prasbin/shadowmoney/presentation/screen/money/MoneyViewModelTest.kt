@@ -1,10 +1,12 @@
 package com.prasbin.shadowmoney.presentation.screen.money
 
+import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import com.prasbin.shadowmoney.data.Money
 import com.prasbin.shadowmoney.data.ShadowMoneyDatabase
 import com.prasbin.shadowmoney.data.model.ACCOUNT_TYPE_BANK
 import com.prasbin.shadowmoney.data.model.ACCOUNT_TYPE_WALLET
+import com.prasbin.shadowmoney.data.model.Account
 import com.prasbin.shadowmoney.data.model.TRANSACTION_DIRECTION_INCOME
 import com.prasbin.shadowmoney.data.model.TRANSACTION_DIRECTION_OUTFLOW
 import com.prasbin.shadowmoney.data.model.Transaction
@@ -204,5 +206,30 @@ class MoneyViewModelTest {
         assertTrue(vm.createAccount("   Pocket money   ", ACCOUNT_TYPE_WALLET, "0"))
         val rows = awaitAccountCount(1)
         assertEquals("Pocket money", rows.single().name)
+    }
+
+    @Test
+    fun viewModelScope_isCancelledAfterViewModelStoreClear() = runBlocking {
+        val store = ViewModelStore()
+        val vm = viewModel()
+        store.put("money", vm)
+
+        accountDao.insert(
+            Account(name = "Wallet", type = ACCOUNT_TYPE_WALLET, openingBalanceMinor = 0L)
+        )
+        withTimeout(10_000) { vm.uiState.first { it.accounts.size == 1 } }
+
+        store.clear()
+
+        accountDao.insert(
+            Account(name = "Second", type = ACCOUNT_TYPE_WALLET, openingBalanceMinor = 0L)
+        )
+        Thread.sleep(750)
+        assertEquals(
+            "Room flow collector must stop after onCleared cancels the scope",
+            1,
+            vm.uiState.value.accounts.size
+        )
+        assertFalse(vm.uiState.value.isLoading)
     }
 }
