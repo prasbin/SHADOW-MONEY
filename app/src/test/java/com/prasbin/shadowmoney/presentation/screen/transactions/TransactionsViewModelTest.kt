@@ -1,5 +1,6 @@
 package com.prasbin.shadowmoney.presentation.screen.transactions
 
+import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import com.prasbin.shadowmoney.data.ShadowMoneyDatabase
 import com.prasbin.shadowmoney.data.imports.ImportDate
@@ -307,5 +308,26 @@ class TransactionsViewModelTest {
         assertNotNull(vm.errorMessage.value)
         vm.clearError()
         assertNull(vm.errorMessage.value)
+    }
+
+    @Test
+    fun viewModelScope_isCancelledAfterViewModelStoreClear() = runBlocking {
+        val store = ViewModelStore()
+        val vm = viewModel()
+        store.put("transactions", vm)
+
+        awaitState(vm) { !it.isLoading }
+
+        store.clear()
+
+        accountDao.insert(
+            Account(name = "Late account", type = ACCOUNT_TYPE_WALLET, openingBalanceMinor = 0L)
+        )
+        Thread.sleep(750)
+        assertTrue(
+            "Room flow collector must stop after onCleared cancels the scope",
+            vm.uiState.value.accounts.isEmpty()
+        )
+        assertTrue(vm.uiState.value.recent.isEmpty())
     }
 }
