@@ -29,6 +29,7 @@ local.properties
 **/generated/
 **/build/generated/
 
-# Room schema export (ksp schemaLocation resolves under app/)
-app/app/
+# Room schema export (ksp schemaLocation resolves under app/app/schemas)
+# is intentionally TRACKED in version control (app/app/schemas/**) so
+# migration review and CI can detect accidental schema changes.
 signing.properties

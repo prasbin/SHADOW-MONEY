@@ -6,6 +6,20 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TransactionDao {
+    /**
+     * Deliberate FULL-DATASET query — loads every transaction in timestamp order.
+     *
+     * Known production callers are one-shot, user-initiated full scans only:
+     * - [com.prasbin.shadowmoney.data.imports.ImportRepository.loadReference] (CSV preview
+     *   duplicate fingerprinting must compare against every existing record to be correct)
+     *
+     * Exposed through `TransactionRepository.getAll()` for tests/facades.
+     *
+     * Every interactive/UI path must stay bounded instead: Dashboard uses [getRecent] (20),
+     * the Transactions screen uses [getRecent] (100), intelligence/assistant use
+     * [getTransactionsInWindow] or SQL aggregates, and backup export uses the dedicated
+     * full-table reads in `BackupDao`. Do NOT wire this query into a screen collection.
+     */
     @Query("SELECT * FROM transactions ORDER BY transactionTimestamp DESC")
     fun getAll(): Flow<List<Transaction>>
 

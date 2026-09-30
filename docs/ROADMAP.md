@@ -1,6 +1,15 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: v1.0 Release Candidate Audit ✅ COMPLETE
+## Current Status: v1.1 Engineering Hardening ✅ COMPLETE
+
+An engineering pass (not a phase — Phases 0–13 remain the complete list, no Phase 14; **no schema change — still Room v7**; version stays `1.0.0` / versionCode 2), baseline `a5a573c`:
+- **Room schema artifacts committed**: genuine KSP-generated JSONs for versions **1–7** now live in `app/app/schemas/` under version control (v2–v7 built from their actual version-bump commits in disposable worktrees; v1 built from its Phase-1 commit with `exportSchema` temporarily enabled — historically false, entities untouched); `.gitignore` un-ignores `app/app/` so future entity changes surface as visible schema diffs
+- **Legacy Jobs cleanup**: `JobsScreen` + `Screen.Jobs` + NavHost registration removed (verified: zero navigators, tests, or dependencies referenced them); Work screen/behavior untouched
+- **Transaction query bounding**: `getAll()` documented in KDoc as a deliberate full-dataset operation (CSV-import fingerprinting only in production); Dashboard/Transactions/intelligence/assistant/backup paths confirmed bounded (recent 20 / recent 100 / time windows / SQL aggregates / dedicated BackupDao)
+- **Backup encryption**: design findings documented in ARCHITECTURE as future v1.x/v2 work — **explicitly NOT implemented**
+- Verification: **691 tests / 66 suites / 0 failures / 0 errors**; lint **0 errors / 27 warnings**; `assembleDebug`/`assembleRelease` OK; release APK re-verified on device (emulator); docs updated, work committed and pushed
+
+Previous status: v1.0 Release Candidate Audit ✅ COMPLETE
 
 An audit pass (not a new phase — Phases 0–13 remain the complete list, no Phase 14; no architecture/financial-calculation changes, **no schema change — still Room v7**), baseline `7651f07`:
 - Full audit across product / financial integrity / security / database / UI / release / performance / tests / docs; one release blocker found and fixed: `MoneyViewModel` and `TransactionsViewModel` lacked `onCleared()` scope cancellation (leaked Room Flow collectors) — fixed with `ViewModelStore.clear()` regression tests

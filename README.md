@@ -4,6 +4,13 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
+**v1.1 Engineering Hardening** ✅ COMPLETE (an engineering pass, not a phase — Phases 0–13 remain the complete list, no Phase 14; **no schema change, still Room v7**; version stays `1.0.0` / versionCode 2):
+- **Room schema artifacts are now version-controlled**: `app/app/schemas/…ShadowMoneyDatabase/` holds genuine KSP-generated JSONs for **versions 1–7** (v2–v7 exported from their real version-bump commits via disposable git worktrees; v1 generated from its Phase-1 commit with `exportSchema` temporarily enabled in the worktree — historically `false`, entities untouched); `.gitignore` no longer excludes `app/app/`, so any future entity change produces a visible schema diff for review/CI
+- **Legacy Jobs cleanup**: the dead `JobsScreen`, `Screen.Jobs`, and its NavHost registration were removed (zero navigators, tests, or dependencies ever referenced them); the Work screen is untouched
+- **Transaction query bounding**: `TransactionDao.getAll()` documented as a deliberate full-dataset operation — production full-scan is only CSV-import duplicate fingerprinting; Dashboard (recent 20), Transactions (recent 100), intelligence/assistant (time windows + SQL aggregates) and backup (dedicated `BackupDao`) all stay bounded
+- **Backup encryption**: architecture review only — documented as future v1.x/v2 work, **not implemented** in this pass
+- Verification: **691 tests / 66 suites / 0 failures / 0 errors**; lint **0 errors / 27 warnings**; `assembleDebug` + `assembleRelease` OK; release identity unchanged (`com.prasbin.shadowmoney`, v1.0.0, versionCode 2, signed v2, CN=Prasbin Dhungana)
+
 **v1.0 Release Candidate Audit** ✅ COMPLETE (an audit pass, not a new phase; Phases 0–13 remain the complete list):
 - Read-only audit of product, financial integrity, security, database, UI/UX, release config, performance, tests and documentation against baseline `7651f07`; one release blocker found and fixed: `MoneyViewModel` and `TransactionsViewModel` created private `CoroutineScope`s without overriding `onCleared`, leaking Room Flow collectors after navigation — both now cancel their scope like every other ViewModel, each guarded by a `ViewModelStore.clear()` regression test
 - Release APK (`com.prasbin.shadowmoney`, v1.0.0) installed and exercised on a **physical Android 16 device (24094RAD4G)** — first install, first-launch empty state, Goals/Secret-Target empty state, crash-free; full route-walk of the release APK completed on the Android 16 emulator (all 8 bottom-nav screens, Transactions, Assistant, Add Account dialog open/cancel, Settings `SHADOW MONEY v1.0.0`, zero logcat crashes)
@@ -101,7 +108,6 @@ A practical, local-first opportunity tracking and organization system (manual tr
 - Financial Assistant
 - Transactions
 - Money
-- Jobs
 - Work
 - Opportunities
 - Settings
