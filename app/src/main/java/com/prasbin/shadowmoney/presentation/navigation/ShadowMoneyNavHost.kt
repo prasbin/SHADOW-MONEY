@@ -54,7 +54,9 @@ fun ShadowMoneyNavHost(
         ) { backStackEntry ->
             TransactionsScreen(
                 navController = navController,
-                initialDirection = backStackEntry.arguments?.getString("direction")
+                initialDirection = Screen.Transactions.normalizeDirection(
+                    backStackEntry.arguments?.getString("direction")
+                )
             )
         }
         composable(Screen.Money.route) {
@@ -100,6 +102,8 @@ object Screen {
         const val directionRoute = "transactions?direction={direction}"
         fun inDirection() = "transactions?direction=in"
         fun outDirection() = "transactions?direction=out"
+        fun normalizeDirection(raw: String?): String? =
+            raw?.takeIf { it == "in" || it == "out" }
     }
     object Import {
         const val route = "import"

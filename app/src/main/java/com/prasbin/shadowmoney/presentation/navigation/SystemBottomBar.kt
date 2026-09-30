@@ -63,7 +63,13 @@ fun SystemBottomBar(navController: NavHostController) {
             NavigationBarItem(
                 selected = selected,
                 onClick = {
-                    if (currentRoute != tab.route) {
+                    val alreadyOnTab = when (tab.route) {
+                        Screen.Transactions.route ->
+                            currentRoute == Screen.Transactions.route ||
+                                currentRoute == Screen.Transactions.directionRoute
+                        else -> currentRoute == tab.route
+                    }
+                    if (!alreadyOnTab) {
                         navController.navigate(tab.route) {
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
