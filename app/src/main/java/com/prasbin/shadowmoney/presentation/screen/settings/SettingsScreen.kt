@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -49,6 +50,7 @@ import com.prasbin.shadowmoney.data.backup.BACKUP_FORMAT_VERSION
 import com.prasbin.shadowmoney.data.backup.BackupRecordCounts
 import com.prasbin.shadowmoney.data.backup.BackupRepository
 import com.prasbin.shadowmoney.data.backup.SafBackupFileIo
+import com.prasbin.shadowmoney.presentation.theme.DarkOnSurface
 import com.prasbin.shadowmoney.presentation.theme.DarkOnSurfaceVariant
 import com.prasbin.shadowmoney.presentation.theme.DarkSurface
 import com.prasbin.shadowmoney.presentation.theme.ErrorRed
@@ -66,7 +68,7 @@ import java.util.Date
  * backups and is not referenced anywhere in this screen.
  */
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(navController: androidx.navigation.NavHostController? = null) {
     val context = LocalContext.current
     val viewModel: BackupViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -150,7 +152,21 @@ fun SettingsScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = {
+                    Column {
+                        Text(
+                            "SYSTEM",
+                            color = NeonCyan,
+                            style = MaterialTheme.typography.titleLarge,
+                            letterSpacing = 2f.sp
+                        )
+                        Text(
+                            "MODULES · DATA · PRIVACY",
+                            color = DarkOnSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = DarkSurface
                 )
@@ -166,23 +182,55 @@ fun SettingsScreen() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineMedium,
-                color = NeonCyan
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
                 text = "SHADOW MONEY v${com.prasbin.shadowmoney.BuildConfig.VERSION_NAME}",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleMedium,
+                color = DarkOnSurface,
+                letterSpacing = 0.5f.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Personal financial system · local-first · offline",
+                style = MaterialTheme.typography.labelSmall,
                 color = DarkOnSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            com.prasbin.shadowmoney.presentation.theme.SystemSectionHeader("Financial system")
+            com.prasbin.shadowmoney.presentation.theme.SystemListRow(
+                title = "Budgets",
+                subtitle = "Monthly limits and category spending",
+                onClick = { navController?.navigate("budgets") }
+            )
+            com.prasbin.shadowmoney.presentation.theme.SystemListRow(
+                title = "Goals",
+                subtitle = "Targets, progress, Secret Target",
+                onClick = { navController?.navigate("goals") }
+            )
+            com.prasbin.shadowmoney.presentation.theme.SystemListRow(
+                title = "Telecom",
+                subtitle = "SIMs, packages, recurring cost",
+                onClick = { navController?.navigate("telecom") }
+            )
+            com.prasbin.shadowmoney.presentation.theme.SystemListRow(
+                title = "Opportunities",
+                subtitle = "Income-growth pipeline",
+                onClick = { navController?.navigate("opportunities") }
+            )
+
+            com.prasbin.shadowmoney.presentation.theme.SystemSectionHeader("Analysis")
+            com.prasbin.shadowmoney.presentation.theme.SystemListRow(
+                title = "Assistant",
+                subtitle = "Ask about your financial records",
+                onClick = { navController?.navigate("assistant") }
+            )
+
+            com.prasbin.shadowmoney.presentation.theme.SystemSectionHeader("Data")
+            com.prasbin.shadowmoney.presentation.theme.SystemListRow(
+                title = "Import transactions (CSV)",
+                subtitle = "Preview, duplicate check, confirm",
+                onClick = { navController?.navigate("import") }
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Local-first financial management",
-                style = MaterialTheme.typography.bodySmall,
-                color = DarkOnSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(24.dp))
 
             BackupSection(
                 state = state,
@@ -198,6 +246,20 @@ fun SettingsScreen() {
                 onConfirmRestore = { showRestoreDialog = true },
                 onDismiss = { viewModel.reset() }
             )
+
+            com.prasbin.shadowmoney.presentation.theme.SystemSectionHeader("Security & privacy")
+            com.prasbin.shadowmoney.presentation.theme.SystemListRow(
+                title = "Secret Target",
+                subtitle = "Private target · managed in Goals",
+                onClick = { navController?.navigate("goals") }
+            )
+            Text(
+                text = "Zero app permissions · no network · no analytics · Secret Target never appears in backups or the assistant.",
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

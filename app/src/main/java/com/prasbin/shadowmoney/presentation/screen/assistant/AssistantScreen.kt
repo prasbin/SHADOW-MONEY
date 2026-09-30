@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -121,12 +122,13 @@ fun AssistantScreen(navController: NavHostController) {
                 title = {
                     Column {
                         Text(
-                            text = "Financial Assistant",
+                            text = "ASSISTANT",
                             style = MaterialTheme.typography.titleLarge,
-                            color = NeonCyan
+                            color = NeonCyan,
+                            letterSpacing = 2f.sp
                         )
                         Text(
-                            text = "Read-only · deterministic · local",
+                            text = "Ask about your financial records.",
                             style = MaterialTheme.typography.labelSmall,
                             color = DarkOnSurfaceVariant
                         )
@@ -220,15 +222,14 @@ private fun AssistantEmptyState(onSample: (String) -> Unit) {
     ) {
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "Ask about your money",
-            style = MaterialTheme.typography.headlineSmall,
+            text = "Your local financial System assistant.",
+            style = MaterialTheme.typography.titleMedium,
             color = NeonCyan
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
         Text(
-            text = "Supported topics: balances, income, spending, budgets, goals, work, " +
-                "telecom, opportunities, recent transactions, and imports.",
-            style = MaterialTheme.typography.bodyMedium,
+            text = "Balances, income, spending, budgets, goals, work, telecom, opportunities, recent transactions, imports.",
+            style = MaterialTheme.typography.bodySmall,
             color = DarkOnSurfaceVariant,
             textAlign = TextAlign.Center
         )

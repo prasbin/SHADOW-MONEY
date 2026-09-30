@@ -43,8 +43,19 @@ fun ShadowMoneyNavHost(
         composable(Screen.Opportunities.route) {
             OpportunitiesScreen(navController = navController)
         }
-        composable(Screen.Transactions.route) {
-            TransactionsScreen(navController = navController)
+        composable(
+            route = Screen.Transactions.directionRoute,
+            arguments = listOf(
+                androidx.navigation.navArgument("direction") {
+                    type = androidx.navigation.NavType.StringType
+                    defaultValue = ""
+                }
+            )
+        ) { backStackEntry ->
+            TransactionsScreen(
+                navController = navController,
+                initialDirection = backStackEntry.arguments?.getString("direction")
+            )
         }
         composable(Screen.Money.route) {
             MoneyScreen(navController = navController)
@@ -60,7 +71,7 @@ fun ShadowMoneyNavHost(
             WorkDetailScreen(workItemId = workItemId, navController = navController)
         }
         composable(Screen.Settings.route) {
-            SettingsScreen()
+            SettingsScreen(navController = navController)
         }
         composable(Screen.Assistant.route) {
             AssistantScreen(navController = navController)
@@ -86,6 +97,9 @@ object Screen {
     }
     object Transactions {
         const val route = "transactions"
+        const val directionRoute = "transactions?direction={direction}"
+        fun inDirection() = "transactions?direction=in"
+        fun outDirection() = "transactions?direction=out"
     }
     object Import {
         const val route = "import"

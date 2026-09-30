@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -84,7 +85,21 @@ fun WorkScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Work Tracker") },
+                title = {
+                    Column {
+                        Text(
+                            "WORK",
+                            color = NeonCyan,
+                            style = MaterialTheme.typography.titleLarge,
+                            letterSpacing = 2f.sp
+                        )
+                        Text(
+                            "JOBS · FREELANCE · PROJECTS",
+                            color = DarkOnSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = DarkSurface
                 )

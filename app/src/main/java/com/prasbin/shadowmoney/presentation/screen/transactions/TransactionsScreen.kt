@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,7 +49,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,7 +79,7 @@ import java.util.Locale
 private val transactionDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
 @Composable
-fun TransactionsScreen(navController: NavHostController) {
+fun TransactionsScreen(navController: NavHostController, initialDirection: String? = null) {
     val context = LocalContext.current
     val viewModel: TransactionsViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -93,15 +98,29 @@ fun TransactionsScreen(navController: NavHostController) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
-    var showAdd by remember { mutableStateOf(false) }
+    var showAdd by remember { mutableStateOf(initialDirection != null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Transactions", color = NeonCyan) },
+                title = {
+                    Column {
+                        Text(
+                            "ACTIVITY",
+                            color = NeonCyan,
+                            style = MaterialTheme.typography.titleLarge,
+                            letterSpacing = 2f.sp
+                        )
+                        Text(
+                            "MONEY IN & OUT · ALL RECORDS",
+                            color = DarkOnSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                },
                 actions = {
                     TextButton(onClick = { navController.navigate(Screen.Import.route) }) {
-                        Text("Import CSV", color = NeonCyan)
+                        Text("IMPORT CSV", color = NeonCyan, style = MaterialTheme.typography.labelSmall)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkSurface)
@@ -140,44 +159,24 @@ fun TransactionsScreen(navController: NavHostController) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    "No transactions yet",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = DarkOnSurface
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    if (state.accounts.isEmpty()) {
-                        "Create an account on the Money screen first, then record income or outflow here."
+                com.prasbin.shadowmoney.presentation.theme.SystemEmptyState(
+                    title = if (state.accounts.isEmpty()) "Set up money first" else "No transactions yet",
+                    message = if (state.accounts.isEmpty()) {
+                        "Create an account, then record money in or out. Your activity will appear here."
                     } else {
-                        "Record income or outflow manually, or import a CSV file."
+                        "Record money in or out, or import a CSV file. Your activity will appear here."
                     },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DarkOnSurfaceVariant
+                    actionLabel = if (state.accounts.isEmpty()) "Add account" else "Record money",
+                    onAction = {
+                        if (state.accounts.isEmpty()) {
+                            navController.navigate(Screen.Money.route)
+                        } else {
+                            showAdd = true
+                        }
+                    },
+                    secondaryLabel = "Import CSV",
+                    onSecondary = { navController.navigate(Screen.Import.route) }
                 )
-                Spacer(modifier = Modifier.height(24.dp))
-                OutlinedButton(
-                    onClick = { showAdd = true },
-                    border = BorderStroke(1.dp, NeonCyan)
-                ) {
-                    Text("Add transaction", color = NeonCyan)
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = { navController.navigate(Screen.Import.route) },
-                    border = BorderStroke(1.dp, NeonCyan)
-                ) {
-                    Text("Import Transactions (CSV)", color = NeonCyan)
-                }
-                if (state.accounts.isEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(
-                        onClick = { navController.navigate(Screen.Money.route) },
-                        border = BorderStroke(1.dp, NeonCyan)
-                    ) {
-                        Text("Go to Money (accounts)", color = NeonCyan)
-                    }
-                }
             }
 
             else -> LazyColumn(
@@ -198,6 +197,7 @@ fun TransactionsScreen(navController: NavHostController) {
                 state = state,
                 defaultDateText = viewModel.defaultDateText,
                 errorMessage = errorMessage,
+                initialDirection = initialDirection,
                 onDismiss = {
                     showAdd = false
                     viewModel.clearError()
@@ -226,37 +226,60 @@ fun TransactionsScreen(navController: NavHostController) {
 private fun TransactionCard(view: TransactionListView) {
     val transaction = view.transaction
     val isIncome = transaction.direction == TRANSACTION_DIRECTION_INCOME
-    val description = if (transaction.note.isBlank()) "Transaction" else transaction.note
+    val description = if (transaction.note.isBlank()) view.categoryName else transaction.note
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-        border = BorderStroke(1.dp, BorderColor)
+        border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            com.prasbin.shadowmoney.presentation.theme.SystemChip(
+                text = if (isIncome) "IN" else "OUT",
+                color = if (isIncome) NeonGreen else NeonPurple
+            )
+            Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     description,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = DarkOnSurface
+                    color = DarkOnSurface,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 Text(
-                    "${view.accountName} · ${view.categoryName} · " +
-                        transactionDateFormat.format(Date(transaction.transactionTimestamp)),
+                    "${view.categoryName} · ${view.accountName}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DarkOnSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Text(
+                    transactionDateFormat.format(Date(transaction.transactionTimestamp)),
                     style = MaterialTheme.typography.labelSmall,
                     color = DarkOnSurfaceVariant
                 )
             }
-            Text(
-                (if (isIncome) "+ " else "- ") + Money.formatNpr(transaction.amountMinor),
-                style = MaterialTheme.typography.bodyLarge,
-                fontFamily = FontFamily.Monospace,
-                color = if (isIncome) NeonGreen else NeonPurple
-            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    (if (isIncome) "+ " else "− ") + Money.formatNpr(transaction.amountMinor),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isIncome) NeonGreen else DarkOnSurface
+                )
+                Text(
+                    if (isIncome) "MONEY IN" else "MONEY OUT",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isIncome) NeonGreen else NeonPurple
+                )
+            }
         }
     }
 }
@@ -266,6 +289,7 @@ private fun AddTransactionDialog(
     state: TransactionsUiState,
     defaultDateText: String,
     errorMessage: String?,
+    initialDirection: String? = null,
     onDismiss: () -> Unit,
     onSave: (
         direction: Int,
@@ -277,7 +301,12 @@ private fun AddTransactionDialog(
         note: String
     ) -> Unit
 ) {
-    var direction by remember { mutableStateOf(TRANSACTION_DIRECTION_OUTFLOW) }
+    var direction by remember {
+        mutableStateOf(
+            if (initialDirection == "in") TRANSACTION_DIRECTION_INCOME
+            else TRANSACTION_DIRECTION_OUTFLOW
+        )
+    }
     var amountText by remember { mutableStateOf("") }
     var dateText by remember { mutableStateOf(defaultDateText) }
     var accountId by remember { mutableStateOf(state.accounts.firstOrNull()?.id ?: 0L) }
@@ -289,6 +318,11 @@ private fun AddTransactionDialog(
     var categoryExpanded by remember { mutableStateOf(false) }
     var workExpanded by remember { mutableStateOf(false) }
 
+    val effectiveAccountId = state.accounts.firstOrNull { it.id == accountId }?.id
+        ?: state.accounts.firstOrNull()?.id
+    if (effectiveAccountId != null && effectiveAccountId != accountId) {
+        accountId = effectiveAccountId
+    }
     val accountName = state.accounts.firstOrNull { it.id == accountId }?.name
         ?: "Select account"
     val categoryOptions = state.categories.filter {
@@ -307,7 +341,7 @@ private fun AddTransactionDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = DarkSurfaceVariant,
-        title = { Text("Add Transaction", color = NeonCyan) },
+        title = { Text("RECORD MONEY", color = NeonCyan, letterSpacing = 1.5f.sp) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 if (noAccounts) {
@@ -318,78 +352,46 @@ private fun AddTransactionDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Amount") },
+                    prefix = { Text("NPR ", color = DarkOnSurfaceVariant, style = MaterialTheme.typography.labelLarge) },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = dialogFieldColors()
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    "TYPE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NeonCyan
+                )
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = direction == TRANSACTION_DIRECTION_OUTFLOW,
-                        onClick = { direction = TRANSACTION_DIRECTION_OUTFLOW },
-                        label = { Text("Outflow") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = NeonPurple,
-                            selectedLabelColor = DarkPrimary
-                        )
-                    )
                     FilterChip(
                         selected = direction == TRANSACTION_DIRECTION_INCOME,
                         onClick = { direction = TRANSACTION_DIRECTION_INCOME },
-                        label = { Text("Income") },
+                        label = { Text("Money In") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = NeonGreen,
                             selectedLabelColor = DarkPrimary
                         )
                     )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { amountText = it },
-                    label = { Text("Amount (NPR)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = dialogFieldColors()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = dateText,
-                    onValueChange = { dateText = it },
-                    label = { Text("Date (yyyy-MM-dd)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = dialogFieldColors()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                ExposedDropdownMenuBox(
-                    expanded = accountExpanded,
-                    onExpandedChange = { if (!noAccounts) accountExpanded = it },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedTextField(
-                        value = accountName,
-                        onValueChange = {},
-                        readOnly = true,
-                        enabled = !noAccounts,
-                        label = { Text("Account") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accountExpanded) },
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
-                        colors = dialogFieldColors()
+                    FilterChip(
+                        selected = direction == TRANSACTION_DIRECTION_OUTFLOW,
+                        onClick = { direction = TRANSACTION_DIRECTION_OUTFLOW },
+                        label = { Text("Money Out") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = NeonPurple,
+                            selectedLabelColor = DarkPrimary
+                        )
                     )
-                    ExposedDropdownMenu(
-                        expanded = accountExpanded,
-                        onDismissRequest = { accountExpanded = false }
-                    ) {
-                        state.accounts.forEach { account ->
-                            DropdownMenuItem(
-                                text = { Text(account.name) },
-                                onClick = {
-                                    accountId = account.id
-                                    accountExpanded = false
-                                }
-                            )
-                        }
-                    }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 ExposedDropdownMenuBox(
                     expanded = categoryExpanded,
                     onExpandedChange = { categoryExpanded = it },
@@ -428,7 +430,50 @@ private fun AddTransactionDialog(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                ExposedDropdownMenuBox(
+                    expanded = accountExpanded,
+                    onExpandedChange = { if (!noAccounts) accountExpanded = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = accountName,
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = !noAccounts,
+                        label = { Text("Account") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accountExpanded) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        colors = dialogFieldColors()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = accountExpanded,
+                        onDismissRequest = { accountExpanded = false }
+                    ) {
+                        state.accounts.forEach { account ->
+                            DropdownMenuItem(
+                                text = { Text(account.name) },
+                                onClick = {
+                                    accountId = account.id
+                                    accountExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = dateText,
+                    onValueChange = { dateText = it },
+                    label = { Text("Date") },
+                    placeholder = { Text("YYYY-MM-DD", color = DarkOnSurfaceVariant) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = dialogFieldColors()
+                )
+                Spacer(modifier = Modifier.height(12.dp))
                 ExposedDropdownMenuBox(
                     expanded = workExpanded,
                     onExpandedChange = { workExpanded = it },
@@ -438,7 +483,7 @@ private fun AddTransactionDialog(
                         value = workName,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Work item (optional)") },
+                        label = { Text("Linked work item (optional)") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = workExpanded) },
                         modifier = Modifier
                             .menuAnchor()
@@ -467,11 +512,11 @@ private fun AddTransactionDialog(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Note") },
+                    label = { Text("Notes (optional)") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                     colors = dialogFieldColors()
@@ -483,7 +528,7 @@ private fun AddTransactionDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 enabled = !noAccounts,
                 onClick = {
                     onSave(
@@ -495,14 +540,23 @@ private fun AddTransactionDialog(
                         workItemId,
                         note
                     )
-                }
+                },
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (direction == TRANSACTION_DIRECTION_INCOME) NeonGreen else NeonPurple,
+                    contentColor = DarkPrimary
+                )
             ) {
-                Text("Save", color = if (noAccounts) DarkOnSurfaceVariant else NeonCyan)
+                Text(
+                    "SAVE",
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    letterSpacing = 1f.sp
+                )
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = DarkOnSurfaceVariant)
+                Text("CANCEL", color = DarkOnSurfaceVariant)
             }
         }
     )

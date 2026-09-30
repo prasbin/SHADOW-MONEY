@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,6 +65,8 @@ import com.prasbin.shadowmoney.presentation.theme.DarkSurface
 import com.prasbin.shadowmoney.presentation.theme.DarkSurfaceVariant
 import com.prasbin.shadowmoney.presentation.theme.ErrorRed
 import com.prasbin.shadowmoney.presentation.theme.NeonCyan
+import com.prasbin.shadowmoney.presentation.theme.NeonPurple
+import com.prasbin.shadowmoney.presentation.theme.NeonGreen
 import com.prasbin.shadowmoney.presentation.theme.WarningAmber
 
 fun accountTypeLabel(type: Int): String = when (type) {
@@ -97,10 +100,24 @@ fun MoneyScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Money", color = NeonCyan) },
+                title = {
+                    Column {
+                        Text(
+                            "MONEY",
+                            color = NeonCyan,
+                            style = MaterialTheme.typography.titleLarge,
+                            letterSpacing = 2f.sp
+                        )
+                        Text(
+                            "ACCOUNTS & BALANCES",
+                            color = DarkOnSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                },
                 actions = {
                     TextButton(onClick = { navController.navigate(Screen.Transactions.route) }) {
-                        Text("Transactions", color = NeonCyan)
+                        Text("ACTIVITY", color = NeonCyan, style = MaterialTheme.typography.labelSmall)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkSurface)
@@ -142,30 +159,17 @@ fun MoneyScreen(navController: NavHostController) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    "No accounts yet",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = DarkOnSurface
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Add your wallet, bank, cash, or digital wallet account to start recording transactions.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DarkOnSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                OutlinedButton(
-                    onClick = {
+                com.prasbin.shadowmoney.presentation.theme.SystemEmptyState(
+                    title = "No accounts yet",
+                    message = "Add your wallet, bank, cash, or digital wallet to start recording money in and out.",
+                    actionLabel = "Add first account",
+                    onAction = {
                         editingAccount = null
                         showForm = true
-                    }
-                ) {
-                    Text("Add account", color = NeonCyan)
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(onClick = { navController.navigate(Screen.Transactions.route) }) {
-                    Text("View Transactions", color = NeonCyan)
-                }
+                    },
+                    secondaryLabel = "View activity",
+                    onSecondary = { navController.navigate(Screen.Transactions.route) }
+                )
             }
 
             else -> LazyColumn(
@@ -175,6 +179,44 @@ fun MoneyScreen(navController: NavHostController) {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                item {
+                    val totalActive = state.accounts.filter { it.account.isActive }
+                        .sumOf { it.balanceMinor }
+                    com.prasbin.shadowmoney.presentation.theme.SystemCard(
+                        title = "Total across accounts",
+                        value = Money.formatNpr(totalActive),
+                        subtitle = "${state.accounts.count { it.account.isActive }} active account(s) · derived from local records",
+                        accentColor = if (totalActive >= 0) NeonCyan else ErrorRed
+                    )
+                }
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        com.prasbin.shadowmoney.presentation.theme.SystemAction(
+                            label = "Money In",
+                            onClick = { navController.navigate(Screen.Transactions.inDirection()) },
+                            accent = NeonGreen,
+                            modifier = Modifier.weight(1f)
+                        )
+                        com.prasbin.shadowmoney.presentation.theme.SystemAction(
+                            label = "Money Out",
+                            onClick = { navController.navigate(Screen.Transactions.outDirection()) },
+                            accent = NeonPurple,
+                            modifier = Modifier.weight(1f)
+                        )
+                        com.prasbin.shadowmoney.presentation.theme.SystemAction(
+                            label = "Import",
+                            onClick = { navController.navigate(Screen.Import.route) },
+                            accent = NeonCyan,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                item {
+                    com.prasbin.shadowmoney.presentation.theme.SystemSectionHeader("Your accounts")
+                }
                 items(state.accounts, key = { it.account.id }) { view ->
                     AccountCard(
                         view = view,
@@ -256,12 +298,23 @@ private fun AccountCard(view: MoneyAccountView, onClick: () -> Unit) {
                     color = DarkOnSurfaceVariant
                 )
             }
-            Text(
-                Money.formatNpr(view.balanceMinor),
-                style = MaterialTheme.typography.bodyLarge,
-                fontFamily = FontFamily.Monospace,
-                color = NeonCyan
-            )
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    Money.formatNpr(view.balanceMinor),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    color = if (view.account.isActive) NeonCyan else DarkOnSurfaceVariant
+                )
+                Text(
+                    "BALANCE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DarkOnSurfaceVariant
+                )
+            }
         }
     }
 }

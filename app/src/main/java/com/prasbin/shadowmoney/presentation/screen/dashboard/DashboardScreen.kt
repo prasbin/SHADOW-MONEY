@@ -2,11 +2,9 @@
 
 package com.prasbin.shadowmoney.presentation.screen.dashboard
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -17,7 +15,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -28,19 +28,20 @@ import com.prasbin.shadowmoney.data.model.ACCOUNT_TYPE_CASH
 import com.prasbin.shadowmoney.data.model.ACCOUNT_TYPE_DIGITAL_WALLET
 import com.prasbin.shadowmoney.data.model.ACCOUNT_TYPE_WALLET
 import com.prasbin.shadowmoney.data.model.TRANSACTION_DIRECTION_INCOME
+import com.prasbin.shadowmoney.presentation.navigation.Screen
 import com.prasbin.shadowmoney.presentation.theme.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private const val TRUST_LABEL = "Local records only · not a bank balance."
+private const val TRUST_LABEL = "LOCAL RECORDS ONLY · NOT A BANK BALANCE"
 
-private val dashboardDateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+private val dashboardDateFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
 private val windowDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
 private fun insightKindLabel(kind: com.prasbin.shadowmoney.intelligence.InsightKind): String = when (kind) {
     com.prasbin.shadowmoney.intelligence.InsightKind.FACT -> "FACT"
-    com.prasbin.shadowmoney.intelligence.InsightKind.CALCULATION -> "CALCULATION"
+    com.prasbin.shadowmoney.intelligence.InsightKind.CALCULATION -> "CALC"
     com.prasbin.shadowmoney.intelligence.InsightKind.ANALYSIS -> "ANALYSIS"
     com.prasbin.shadowmoney.intelligence.InsightKind.PROJECTION -> "PROJECTION"
 }
@@ -106,10 +107,11 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController? = null
                         Text(
                             text = "SHADOW MONEY",
                             style = MaterialTheme.typography.titleLarge,
-                            color = NeonCyan
+                            color = NeonCyan,
+                            letterSpacing = 3.sp
                         )
                         Text(
-                            text = TRUST_LABEL,
+                            text = "PERSONAL FINANCIAL SYSTEM",
                             style = MaterialTheme.typography.labelSmall,
                             color = DarkOnSurfaceVariant
                         )
@@ -118,75 +120,25 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController? = null
                 actions = {
                     TextButton(
                         onClick = {
-                            navController?.navigate(
-                                com.prasbin.shadowmoney.presentation.navigation.Screen.Assistant.route
-                            )
+                            navController?.navigate(Screen.Assistant.route)
                         }
                     ) {
-                        Text("Ask", color = NeonCyan)
+                        Text("ASK", color = NeonCyan, style = MaterialTheme.typography.labelLarge)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = DarkSurface
                 )
             )
-        },
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = true,
-                    onClick = { },
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text("Dashboard") }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Goals.route) },
-                    icon = { Text("G") },
-                    label = { Text("Goals") }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Budgets.route) },
-                    icon = { Text("B") },
-                    label = { Text("Budgets") }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Work.route) },
-                    icon = { Text("W") },
-                    label = { Text("Work") }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Telecom.route) },
-                    icon = { Text("T") },
-                    label = { Text("Telecom") }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Opportunities.route) },
-                    icon = { Text("O") },
-                    label = { Text("Opps") }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Money.route) },
-                    icon = { Text("$") },
-                    label = { Text("Money") }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { navController?.navigate(com.prasbin.shadowmoney.presentation.navigation.Screen.Settings.route) },
-                    icon = { Text("S") },
-                    label = { Text("Settings") }
-                )
-            }
         }
     ) { innerPadding ->
         when (val currentState = state) {
             is DashboardUiState.Loading -> DashboardLoading(modifier = Modifier.padding(innerPadding))
-            is DashboardUiState.Empty -> DashboardEmpty(modifier = Modifier.padding(innerPadding))
+            is DashboardUiState.Empty -> DashboardEmpty(
+                navController = navController,
+                intelligenceState = intelligenceState,
+                modifier = Modifier.padding(innerPadding)
+            )
             is DashboardUiState.Error -> DashboardError(
                 message = currentState.message,
                 modifier = Modifier.padding(innerPadding)
@@ -194,6 +146,7 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController? = null
             is DashboardUiState.Content -> DashboardContent(
                 state = currentState,
                 intelligenceState = intelligenceState,
+                navController = navController,
                 modifier = Modifier.padding(innerPadding)
             )
         }
@@ -210,35 +163,8 @@ private fun DashboardLoading(modifier: Modifier = Modifier) {
         CircularProgressIndicator(color = NeonCyan)
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Loading local records…",
+            text = "Reading local records…",
             style = MaterialTheme.typography.bodyMedium,
-            color = DarkOnSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun DashboardEmpty(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "No financial records yet",
-            style = MaterialTheme.typography.headlineMedium,
-            color = NeonCyan
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Add an account and record transactions to see your dashboard.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = DarkOnSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = TRUST_LABEL,
-            style = MaterialTheme.typography.labelSmall,
             color = DarkOnSurfaceVariant
         )
     }
@@ -252,7 +178,7 @@ private fun DashboardError(message: String, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Dashboard unavailable",
+            text = "DASHBOARD UNAVAILABLE",
             style = MaterialTheme.typography.headlineMedium,
             color = ErrorRed
         )
@@ -265,82 +191,206 @@ private fun DashboardError(message: String, modifier: Modifier = Modifier) {
     }
 }
 
+// ---- PRIMARY STATUS ----------------------------------------------------------
+
 @Composable
-private fun DashboardContent(
-    state: DashboardUiState.Content,
+private fun PrimaryStatusCard(
+    balanceMinor: Long,
+    incomeMinor: Long,
+    outflowMinor: Long
+) {
+    val net = incomeMinor - outflowMinor
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, BorderColor, MaterialTheme.shapes.medium),
+        shape = MaterialTheme.shapes.medium,
+        color = CardColor
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "TOTAL BALANCE",
+                style = MaterialTheme.typography.labelSmall,
+                color = NeonCyan,
+                letterSpacing = 1.5.sp
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = Money.formatNpr(balanceMinor),
+                style = MaterialTheme.typography.displayLarge,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                color = if (balanceMinor >= 0) DarkOnSurface else ErrorRed,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = TRUST_LABEL,
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = BorderColor)
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                SystemMetric(
+                    label = "Money in",
+                    value = Money.formatNpr(incomeMinor),
+                    valueColor = NeonGreen,
+                    modifier = Modifier.weight(1f)
+                )
+                SystemMetric(
+                    label = "Money out",
+                    value = Money.formatNpr(outflowMinor),
+                    valueColor = NeonPurple,
+                    modifier = Modifier.weight(1f)
+                )
+                SystemMetric(
+                    label = "Net",
+                    value = Money.formatNpr(net),
+                    valueColor = if (net >= 0) NeonGreen else ErrorRed,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+// ---- QUICK ACTIONS -----------------------------------------------------------
+
+@Composable
+private fun QuickActions(
+    hasAccounts: Boolean,
+    navController: androidx.navigation.NavHostController?
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (hasAccounts) {
+            SystemAction(
+                label = "Money In",
+                onClick = { navController?.navigate(Screen.Transactions.inDirection()) },
+                accent = NeonGreen,
+                modifier = Modifier.weight(1f)
+            )
+            SystemAction(
+                label = "Money Out",
+                onClick = { navController?.navigate(Screen.Transactions.outDirection()) },
+                accent = NeonPurple,
+                modifier = Modifier.weight(1f)
+            )
+            SystemAction(
+                label = "Import",
+                onClick = { navController?.navigate(Screen.Import.route) },
+                accent = NeonCyan,
+                modifier = Modifier.weight(1f)
+            )
+        } else {
+            SystemAction(
+                label = "Add Account",
+                onClick = { navController?.navigate(Screen.Money.route) },
+                accent = NeonCyan,
+                modifier = Modifier.weight(1f)
+            )
+            SystemAction(
+                label = "Import CSV",
+                onClick = { navController?.navigate(Screen.Import.route) },
+                accent = NeonCyan,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+// ---- EMPTY / CONTENT ---------------------------------------------------------
+
+@Composable
+private fun DashboardEmpty(
+    navController: androidx.navigation.NavHostController?,
     intelligenceState: IntelligenceUiState,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { PrimaryStatusCard(balanceMinor = 0L, incomeMinor = 0L, outflowMinor = 0L) }
+        item { QuickActions(hasAccounts = false, navController = navController) }
+        item {
+            SystemEmptyState(
+                title = "No records yet",
+                message = "Add an account to start tracking money in and out. Everything stays on this device.",
+                actionLabel = "Add first account",
+                onAction = { navController?.navigate(Screen.Money.route) }
+            )
+        }
+        item { IntelligenceSection(state = intelligenceState) }
+    }
+}
+
+@Composable
+private fun DashboardContent(
+    state: DashboardUiState.Content,
+    intelligenceState: IntelligenceUiState,
+    navController: androidx.navigation.NavHostController?,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            SystemPanel(title = "Financial Summary") {
-                SystemCard(
-                    title = "Total Balance",
-                    value = Money.formatNpr(state.totalBalanceMinor),
-                    accentColor = if (state.totalBalanceMinor >= 0) NeonGreen else ErrorRed,
-                    subtitle = "Active accounts · derived from local records"
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SystemCard(
-                        title = "Income",
-                        value = Money.formatNpr(state.totalIncomeMinor),
-                        accentColor = NeonGreen,
-                        modifier = Modifier.weight(1f)
-                    )
-                    SystemCard(
-                        title = "Outflow",
-                        value = Money.formatNpr(state.totalOutflowMinor),
-                        accentColor = NeonPurple,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
+            PrimaryStatusCard(
+                balanceMinor = state.totalBalanceMinor,
+                incomeMinor = state.totalIncomeMinor,
+                outflowMinor = state.totalOutflowMinor
+            )
         }
+        item { QuickActions(hasAccounts = state.accounts.isNotEmpty(), navController = navController) }
+
         item {
-            SystemPanel(title = "Accounts") {
-                if (state.accounts.isEmpty()) {
-                    SectionEmptyRow("No accounts recorded yet")
-                }
-                state.accounts.forEach { view ->
-                    AccountRow(view)
-                }
-            }
-        }
-        item {
-            SystemPanel(title = "Outflow by Category") {
-                if (state.categoryOutflow.isEmpty()) {
-                    SectionEmptyRow("No outflow recorded")
-                }
-                state.categoryOutflow.forEach { view ->
-                    CategorySpendRow(view)
-                }
-            }
-        }
-        item {
-            SystemPanel(title = "Recent Transactions") {
+            SystemPanel(
+                title = "Recent activity",
+                actionLabel = "VIEW ALL >",
+                onAction = { navController?.navigate(Screen.Transactions.route) }
+            ) {
                 if (state.recentTransactions.isEmpty()) {
                     SectionEmptyRow("No transactions yet")
                 }
-                state.recentTransactions.forEach { view ->
+                state.recentTransactions.take(5).forEach { view ->
                     TransactionRow(view)
                 }
             }
         }
-        item {
-            SystemPanel(title = "Goals") {
-                if (state.goals.isEmpty()) {
-                    SectionEmptyRow("No goals yet")
-                }
-                state.goals.forEach { view ->
-                    GoalRow(view)
+
+        if (state.categoryOutflow.isNotEmpty()) {
+            item {
+                SystemPanel(title = "Spending by category") {
+                    state.categoryOutflow.take(5).forEach { view ->
+                        CategorySpendRow(view)
+                    }
                 }
             }
         }
+
+        if (state.goals.isNotEmpty()) {
+            item {
+                SystemPanel(
+                    title = "Goals",
+                    actionLabel = "ALL >",
+                    onAction = { navController?.navigate(Screen.Goals.route) }
+                ) {
+                    state.goals.take(3).forEach { view ->
+                        GoalRow(view)
+                    }
+                }
+            }
+        }
+
         item {
             IntelligenceSection(state = intelligenceState)
         }
@@ -357,49 +407,25 @@ private fun SectionEmptyRow(text: String) {
 }
 
 @Composable
-private fun AccountRow(view: com.prasbin.shadowmoney.data.AccountBalanceView) {
-    val account = view.account
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = account.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (account.isActive) DarkOnSurface else DarkOnSurfaceVariant
-            )
-            Text(
-                text = if (account.isActive) accountTypeLabel(account.type) else "Archived",
-                style = MaterialTheme.typography.labelSmall,
-                color = DarkOnSurfaceVariant
-            )
-        }
-        Text(
-            text = Money.formatNpr(view.balanceMinor),
-            style = MaterialTheme.typography.bodyLarge,
-            fontFamily = FontFamily.Monospace,
-            color = if (account.isActive) NeonCyan else DarkOnSurfaceVariant
-        )
-    }
-}
-
-@Composable
 private fun CategorySpendRow(view: com.prasbin.shadowmoney.data.CategorySpendView) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = view.name,
-            style = MaterialTheme.typography.bodyLarge,
+            text = if (view.categoryId == null) "${view.name} · uncategorized" else view.name,
+            style = MaterialTheme.typography.bodyMedium,
             color = if (view.categoryId == null) WarningAmber else DarkOnSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = Money.formatNpr(view.totalMinor),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.SemiBold,
             color = DarkOnSurface
         )
     }
@@ -409,28 +435,40 @@ private fun CategorySpendRow(view: com.prasbin.shadowmoney.data.CategorySpendVie
 private fun TransactionRow(view: com.prasbin.shadowmoney.data.RecentTransactionView) {
     val transaction = view.transaction
     val isIncome = transaction.direction == TRANSACTION_DIRECTION_INCOME
-    val description = if (transaction.note.isBlank()) "Transaction" else transaction.note
+    val description = if (transaction.note.isBlank()) view.categoryName else transaction.note
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        SystemChip(
+            text = if (isIncome) "IN" else "OUT",
+            color = if (isIncome) NeonGreen else NeonPurple
+        )
+        Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodyLarge,
-                color = DarkOnSurface
+                color = DarkOnSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "${view.accountName} · ${view.categoryName} · ${dashboardDateFormat.format(Date(transaction.transactionTimestamp))}",
+                text = "${view.categoryName} · ${view.accountName} · ${dashboardDateFormat.format(Date(transaction.transactionTimestamp))}",
                 style = MaterialTheme.typography.labelSmall,
-                color = DarkOnSurfaceVariant
+                color = DarkOnSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = (if (isIncome) "+ " else "− ") + Money.formatNpr(transaction.amountMinor),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleMedium,
             fontFamily = FontFamily.Monospace,
-            color = if (isIncome) NeonGreen else NeonPurple
+            fontWeight = FontWeight.SemiBold,
+            color = if (isIncome) NeonGreen else DarkOnSurface,
+            maxLines = 1
         )
     }
 }
@@ -438,7 +476,7 @@ private fun TransactionRow(view: com.prasbin.shadowmoney.data.RecentTransactionV
 @Composable
 private fun GoalRow(view: com.prasbin.shadowmoney.data.GoalProgressView) {
     val goal = view.goal
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -447,26 +485,30 @@ private fun GoalRow(view: com.prasbin.shadowmoney.data.GoalProgressView) {
                 text = goal.name,
                 style = MaterialTheme.typography.bodyLarge,
                 color = DarkOnSurface,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             if (view.progressPercent != null) {
                 Text(
                     text = "${view.progressPercent}%",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
                     color = NeonCyan
                 )
             }
         }
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         if (view.progressPercent != null) {
             LinearProgressIndicator(
                 progress = { view.progressPercent / 100f },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(6.dp),
                 color = NeonCyan,
-                trackColor = BorderColor
+                trackColor = BorderColor,
+                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(5.dp))
             Text(
                 text = "${Money.formatNpr(view.savedMinor ?: 0L)} of ${Money.formatNpr(goal.targetAmountMinor)}",
                 style = MaterialTheme.typography.labelSmall,
@@ -502,9 +544,9 @@ private fun IntelligenceSection(state: IntelligenceUiState) {
                 val report = state.report
                 Text(
                     text = if (report.sufficientData) {
-                        "Deterministic analysis of stored records · window since ${windowDateFormat.format(Date(report.windowStart))}"
+                        "DETERMINISTIC ANALYSIS OF LOCAL RECORDS · SINCE ${windowDateFormat.format(Date(report.windowStart))}"
                     } else {
-                        "Insufficient data for meaningful intelligence insights — more recorded history is needed"
+                        "NEEDS MORE RECORDED HISTORY FOR MEANINGFUL INSIGHTS"
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = if (report.sufficientData) DarkOnSurfaceVariant else WarningAmber
@@ -531,24 +573,23 @@ private fun IntelligenceSection(state: IntelligenceUiState) {
 
 @Composable
 private fun InsightRow(insight: com.prasbin.shadowmoney.intelligence.Insight) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
+            SystemChip(
                 text = insightKindLabel(insight.kind),
-                style = MaterialTheme.typography.labelSmall,
-                fontFamily = FontFamily.Monospace,
-                color = insightKindColor(insight.kind),
-                fontWeight = FontWeight.Bold
+                color = insightKindColor(insight.kind)
             )
             if (insight.amountMinor != null) {
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "  ${Money.formatNpr(insight.amountMinor)}",
+                    text = Money.formatNpr(insight.amountMinor),
                     style = MaterialTheme.typography.labelSmall,
                     fontFamily = FontFamily.Monospace,
                     color = DarkOnSurface
                 )
             }
         }
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = insight.title,
             style = MaterialTheme.typography.bodyLarge,
