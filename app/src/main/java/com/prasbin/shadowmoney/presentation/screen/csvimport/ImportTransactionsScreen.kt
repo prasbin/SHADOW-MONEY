@@ -32,12 +32,16 @@ import com.prasbin.shadowmoney.data.imports.ImportRow
 import com.prasbin.shadowmoney.data.imports.ImportRowState
 import com.prasbin.shadowmoney.data.model.Account
 import com.prasbin.shadowmoney.data.model.Category
+import com.prasbin.shadowmoney.data.statements.StatementSource
+import com.prasbin.shadowmoney.data.statements.StatementSummary
 import com.prasbin.shadowmoney.presentation.theme.*
 
 /**
- * Local-first CSV import flow: source → parse/validation preview → duplicate
- * review → explicit confirmation → result. The preview is read-only; no
- * financial record exists until the user confirms the final import.
+ * Local-first real statement ingestion: pick a statement file (CSV or PDF)
+ * or paste CSV → content-based source detection confirmed by the user →
+ * read-only preview → duplicate review → explicit confirmation → result.
+ * The preview is read-only; no financial record exists until the user
+ * confirms the final import. Nothing here ever shows "connected".
  */
 @Composable
 fun ImportTransactionsScreen(navController: NavHostController) {
@@ -62,12 +66,17 @@ fun ImportTransactionsScreen(navController: NavHostController) {
             if (stream == null) {
                 viewModel.reportSourceError("Could not open the selected file")
             } else {
-                when (val result = CsvStreamReader.readBounded(stream)) {
-                    is CsvStreamReader.ReadResult.Ok -> viewModel.submitCsv(result.text)
-                    is CsvStreamReader.ReadResult.TooLarge -> viewModel.reportSourceError(
-                        "File exceeds the ${CsvStreamReader.MAX_IMPORT_BYTES / (1024 * 1024)} MB import limit"
-                    )
-                    is CsvStreamReader.ReadResult.ReadError ->
+                when (val result = CsvStreamReader.readBytesBounded(stream)) {
+                    is CsvStreamReader.BytesReadResult.Bytes ->
+                        viewModel.submitStatementBytes(
+                            bytes = result.bytes,
+                            documentName = statementDisplayName(context, uri)
+                        )
+                    is CsvStreamReader.BytesReadResult.TooLarge ->
+                        viewModel.reportSourceError(
+                            "File exceeds the ${CsvStreamReader.MAX_IMPORT_BYTES / (1024 * 1024)} MB import limit"
+                        )
+                    is CsvStreamReader.BytesReadResult.ReadError ->
                         viewModel.reportSourceError(result.reason)
                 }
             }
@@ -77,7 +86,7 @@ fun ImportTransactionsScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Import Transactions") },
+                title = { Text("Import Real Statement") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = NeonCyan)
@@ -103,6 +112,7 @@ fun ImportTransactionsScreen(navController: NavHostController) {
                 onPickFile = {
                     csvLauncher.launch(
                         arrayOf(
+                            "application/pdf",
                             "text/csv",
                             "text/comma-separated-values",
                             "text/plain",
@@ -115,7 +125,14 @@ fun ImportTransactionsScreen(navController: NavHostController) {
             )
 
             is ImportUiState.Loading -> ImportLoadingStep(
-                message = "Parsing and validating CSV…",
+                message = "Reading and validating statement…",
+                modifier = Modifier.padding(innerPadding)
+            )
+
+            is ImportUiState.SourceConfirm -> ImportSourceConfirmStep(
+                state = currentState,
+                onConfirmSource = { source -> viewModel.confirmSource(source) },
+                onDiscard = { viewModel.startOver() },
                 modifier = Modifier.padding(innerPadding)
             )
 
@@ -127,6 +144,7 @@ fun ImportTransactionsScreen(navController: NavHostController) {
                 },
                 onAccountMapping = { name, accountId -> viewModel.setAccountMapping(name, accountId) },
                 onCategoryMapping = { name, categoryId -> viewModel.setCategoryMapping(name, categoryId) },
+                onDefaultAccount = { accountId -> viewModel.setDefaultAccount(accountId) },
                 modifier = Modifier.padding(innerPadding)
             )
 
@@ -155,6 +173,7 @@ fun ImportTransactionsScreen(navController: NavHostController) {
                 success = currentState,
                 onDone = { viewModel.startOver() },
                 onBack = { navController.popBackStack() },
+                onReconciliation = { navController.navigate("connections") },
                 modifier = Modifier.padding(innerPadding)
             )
 
@@ -196,11 +215,12 @@ private fun ImportSourceStep(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        SystemPanel(title = "CSV source") {
+        SystemPanel(title = "Statement source") {
             Text(
-                text = "Import your own exported transaction data. " +
+                text = "Import your own exported statement (CSV or PDF). " +
                     "You choose the file or paste the text — the app never " +
-                    "accesses banks, wallets or any network service.",
+                    "accesses banks, wallets or any network service, and never " +
+                    "stores the file itself.",
                 style = MaterialTheme.typography.bodySmall,
                 color = DarkOnSurfaceVariant
             )
@@ -210,7 +230,7 @@ private fun ImportSourceStep(
                 modifier = Modifier.fillMaxWidth(),
                 border = BorderStroke(1.dp, NeonCyan)
             ) {
-                Text("Select CSV file (device picker)", color = NeonCyan)
+                Text("IMPORT REAL STATEMENT (CSV or PDF, device picker)", color = NeonCyan)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -248,7 +268,7 @@ private fun ImportSourceStep(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Maximum input size: ${CsvStreamReader.MAX_IMPORT_BYTES / (1024 * 1024)} MB. " +
-                    "The CSV content stays in memory only.",
+                    "The content stays in memory only.",
                 style = MaterialTheme.typography.labelSmall,
                 color = DarkOnSurfaceVariant
             )
@@ -257,11 +277,12 @@ private fun ImportSourceStep(
         Spacer(modifier = Modifier.height(16.dp))
 
         SystemPanel(title = "Flow") {
-            ImportStepLine("1", "Source — paste CSV or pick a file")
-            ImportStepLine("2", "Parse & validate — read-only preview")
-            ImportStepLine("3", "Duplicate review — import or skip each match")
-            ImportStepLine("4", "Confirmation — you choose what is written")
-            ImportStepLine("5", "Result — imported rows become normal transactions")
+            ImportStepLine("1", "Select statement file (CSV or PDF) or paste CSV")
+            ImportStepLine("2", "Confirm source — content detection is a suggestion")
+            ImportStepLine("3", "Parse & validate — read-only preview")
+            ImportStepLine("4", "Duplicate review — import or skip each match")
+            ImportStepLine("5", "Confirmation — you choose what is written")
+            ImportStepLine("6", "Result — imported rows become normal transactions")
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "No database write has happened yet.",
@@ -273,25 +294,172 @@ private fun ImportSourceStep(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        SystemPanel(title = "Required CSV columns") {
+        SystemPanel(title = "Required columns") {
             Text(
-                text = "Required: date, description, amount, direction, account",
+                text = "CSV required: date, description, amount, direction, account",
                 style = MaterialTheme.typography.bodySmall,
                 color = DarkOnSurface
             )
             Text(
-                text = "Optional: category, external reference (external_ref / reference / transaction_id)",
+                text = "Optional: category, external reference (external_ref / reference / transaction_id), balance",
                 style = MaterialTheme.typography.bodySmall,
                 color = DarkOnSurface
             )
             Text(
-                text = "Accepted headers include aliases such as transaction_date, note and type. " +
-                    "Ambiguous or missing columns reject the preview instead of guessing.",
+                text = "PDF statements need a clear table header with date, description " +
+                    "and amount (or debit/credit). Lines that do not fit are kept for " +
+                    "review — never dropped. Encrypted or image-only PDFs fail safely " +
+                    "with a clear message instead of guessing.",
                 style = MaterialTheme.typography.labelSmall,
                 color = DarkOnSurfaceVariant
             )
         }
     }
+}
+
+@Composable
+private fun ImportSourceConfirmStep(
+    state: ImportUiState.SourceConfirm,
+    onConfirmSource: (StatementSource) -> Unit,
+    onDiscard: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var chosen by remember(state.documentName) {
+        mutableStateOf(
+            if (state.detection.candidate.isKnown) state.detection.candidate
+            else StatementSource.UNKNOWN
+        )
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        SystemPanel(title = "Confirm statement source") {
+            Text(
+                text = "Which provider issued this statement? The suggestion below " +
+                    "comes from the file's own content only — never the filename. " +
+                    "Confirm or change it; nothing is ever labelled connected.",
+                style = MaterialTheme.typography.bodySmall,
+                color = DarkOnSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Document: ${state.documentName} (${state.format.storageName})",
+                style = MaterialTheme.typography.labelMedium,
+                color = DarkOnSurface
+            )
+            Text(
+                text = "Content evidence: ${state.detection.evidence}",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (state.detection.candidate.isKnown) NeonCyan else WarningAmber
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+            StatementSourceOptionRow(
+                source = StatementSource.SANIMA,
+                chosen = chosen,
+                onChoose = { chosen = it }
+            )
+            StatementSourceOptionRow(
+                source = StatementSource.GLOBAL_IME,
+                chosen = chosen,
+                onChoose = { chosen = it }
+            )
+            StatementSourceOptionRow(
+                source = StatementSource.ESEWA,
+                chosen = chosen,
+                onChoose = { chosen = it }
+            )
+            StatementSourceOptionRow(
+                source = StatementSource.UNKNOWN,
+                chosen = chosen,
+                onChoose = { chosen = it }
+            )
+
+            if (state.unparsedLines.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${state.unparsedLines.size} unrecognized line(s) will be kept " +
+                        "for review in the preview — nothing is silently dropped.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = WarningAmber
+                )
+                state.unparsedLines.take(3).forEach { line ->
+                    Text(
+                        text = "· $line",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DarkOnSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { onConfirmSource(chosen) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkPrimary)
+            ) {
+                Text(
+                    text = if (chosen.isKnown) {
+                        "Continue as ${chosen.label}"
+                    } else {
+                        "Continue — unknown source"
+                    }
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Imported rows will be recorded as IMPORTED / USER-PROVIDED " +
+                    "evidence, never as a live or verified connection.",
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            TextButton(onClick = onDiscard) {
+                Text("Cancel", color = ErrorRed)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatementSourceOptionRow(
+    source: StatementSource,
+    chosen: StatementSource,
+    onChoose: (StatementSource) -> Unit
+) {
+    val selected = chosen == source
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = { onChoose(source) })
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = source.label + if (source == StatementSource.UNKNOWN) " (ask me later)" else "",
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (selected) NeonCyan else DarkOnSurface
+        )
+    }
+}
+
+private fun statementDisplayName(context: android.content.Context, uri: android.net.Uri): String {
+    try {
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            if (index >= 0 && cursor.moveToFirst()) {
+                cursor.getString(index)?.let { return it }
+            }
+        }
+    } catch (_: Exception) {
+        // fall through to the URI segment
+    }
+    return uri.lastPathSegment ?: "statement"
 }
 
 @Composable
@@ -360,6 +528,7 @@ private fun ImportSuccessStep(
     success: ImportUiState.Success,
     onDone: () -> Unit,
     onBack: () -> Unit,
+    onReconciliation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -407,7 +576,40 @@ private fun ImportSuccessStep(
                 color = DarkOnSurfaceVariant
             )
         }
+
+        val documentName = success.statementDocumentName
+        if (documentName != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            SystemPanel(title = "Statement evidence recorded") {
+                Text(
+                    text = "Document: $documentName",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DarkOnSurface
+                )
+                Text(
+                    text = "Source: ${success.statementProviderLabel ?: "Unknown source"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DarkOnSurface
+                )
+                Text(
+                    text = "IMPORTED / USER-PROVIDED — recorded as evidence for " +
+                        "reconciliation. Never shown as a connected or verified balance.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NeonCyan
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
+        if (documentName != null) {
+            Button(
+                onClick = onReconciliation,
+                colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkPrimary)
+            ) {
+                Text("VIEW RECONCILIATION")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
         Button(
             onClick = onDone,
             colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = DarkPrimary)
@@ -421,6 +623,14 @@ private fun ImportSuccessStep(
     }
 }
 
+private fun formatStatementDate(epochMs: Long?): String {
+    if (epochMs == null) return "unknown"
+    return java.time.ZonedDateTime.ofInstant(
+        java.time.Instant.ofEpochMilli(epochMs),
+        com.prasbin.shadowmoney.data.BudgetCalendar.KATHMANDU_ZONE
+    ).toLocalDate().toString()
+}
+
 @Composable
 private fun ImportPreviewStep(
     state: ImportUiState.PreviewReady,
@@ -428,6 +638,7 @@ private fun ImportPreviewStep(
     onDuplicateDecision: (Int, Boolean) -> Unit,
     onAccountMapping: (String, Long?) -> Unit,
     onCategoryMapping: (String, Long?) -> Unit,
+    onDefaultAccount: (Long?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val preview = state.preview
@@ -454,6 +665,93 @@ private fun ImportPreviewStep(
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        val statement = state.statement
+        val summary = state.summary
+        if (statement != null && summary != null) {
+            item {
+                SystemPanel(title = "Statement evidence (imported / user-provided)") {
+                    Text(
+                        text = "Document: ${statement.documentName} · ${statement.format.storageName}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DarkOnSurface
+                    )
+                    Text(
+                        text = "Source: ${state.statementProviderLabel ?: "Unknown source"} " +
+                            "— ${statement.detection.evidence}; confirmed by you",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DarkOnSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Period: ${formatStatementDate(summary.periodStartMs)} → " +
+                            formatStatementDate(summary.periodEndMs),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DarkOnSurface
+                    )
+                    Text(
+                        text = "Rows: ${summary.totalRows} total · ${summary.importableRows} importable · " +
+                            "${summary.invalidRows} invalid · ${summary.duplicateRows} possible duplicates",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DarkOnSurface
+                    )
+                    Text(
+                        text = "Money in: ${Money.formatNpr(summary.moneyInMinor)} · " +
+                            "Money out: ${Money.formatNpr(summary.moneyOutMinor)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DarkOnSurface
+                    )
+                    summary.endBalanceMinor?.let { balance ->
+                        Text(
+                            text = "IMPORTED / USER-PROVIDED BALANCE: " + Money.formatNpr(balance),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NeonCyan
+                        )
+                        Text(
+                            text = "As of this statement's own period end — not a current or verified bank balance.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DarkOnSurfaceVariant
+                        )
+                    } ?: Text(
+                        text = "IMPORTED / USER-PROVIDED BALANCE: not stated in this document",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DarkOnSurfaceVariant
+                    )
+                    if (summary.unparsedLines > 0) {
+                        Text(
+                            text = "${summary.unparsedLines} unrecognized line(s) kept for review — never dropped.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = WarningAmber
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+        }
+
+        if (state.needsAccountAssignment) {
+            item {
+                SystemPanel(title = "Assign rows to an account") {
+                    Text(
+                        text = "This document has no account column. Choose which local " +
+                            "account these rows belong to — rows stay visibly invalid until " +
+                            "you do, and nothing is guessed.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DarkOnSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    ImportMappingDropdown(
+                        label = "Statement account",
+                        kind = "account (not assigned)",
+                        options = state.accounts.map { it.id to it.name } +
+                            (null to "Not assigned (rows stay invalid)"),
+                        selectedId = state.defaultAccountId,
+                        onSelect = { onDefaultAccount(it) }
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
         }
 
         item {

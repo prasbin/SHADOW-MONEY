@@ -17,6 +17,10 @@ class RestoreEngine(private val database: ShadowMoneyDatabase) {
     suspend fun restore(payload: BackupPayload) {
         database.withTransaction {
             val dao = database.backupDao()
+            // Imported statement metadata is intentionally outside the backup
+            // payload; clear it so restored transactions never point at stale
+            // statement evidence. Their IMPORT_FILE provenance is preserved.
+            dao.deleteAllImportedStatements()
             dao.deleteAllTransactions()
             dao.deleteAllGoals()
             dao.deleteAllBudgets()

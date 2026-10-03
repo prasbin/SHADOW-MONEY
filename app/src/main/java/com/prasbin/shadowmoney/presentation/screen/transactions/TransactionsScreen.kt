@@ -166,7 +166,7 @@ fun TransactionsScreen(navController: NavHostController, initialDirection: Strin
                     message = if (state.accounts.isEmpty()) {
                         "Create an account, then record money in or out. Your activity will appear here."
                     } else {
-                        "Record money in or out, or import a CSV file. Your activity will appear here."
+                        "Record money in or out, or import a real statement (CSV or PDF). Your activity will appear here."
                     },
                     actionLabel = if (state.accounts.isEmpty()) "Add account" else "Record money",
                     onAction = {
@@ -176,7 +176,7 @@ fun TransactionsScreen(navController: NavHostController, initialDirection: Strin
                             showAdd = true
                         }
                     },
-                    secondaryLabel = "Import CSV",
+                    secondaryLabel = "IMPORT REAL STATEMENT",
                     onSecondary = { navController.navigate(Screen.Import.route) }
                 )
             }

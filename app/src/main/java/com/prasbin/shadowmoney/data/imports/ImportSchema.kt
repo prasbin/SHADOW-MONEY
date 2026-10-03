@@ -4,14 +4,14 @@ package com.prasbin.shadowmoney.data.imports
  * Supported CSV import columns and deterministic header resolution.
  *
  * Required columns: date, description, amount, direction, account.
- * Optional columns: category, external reference.
+ * Optional columns: category, external reference, balance.
  *
  * Header names are normalized (trim, lower-case, non-alphanumeric runs become
  * "_") and matched against a bounded alias set. Ambiguous headers (two columns
  * resolving to the same logical column) are rejected instead of guessed.
  */
 enum class ImportColumn {
-    DATE, DESCRIPTION, AMOUNT, DIRECTION, ACCOUNT, CATEGORY, EXTERNAL_REF;
+    DATE, DESCRIPTION, AMOUNT, DIRECTION, ACCOUNT, CATEGORY, EXTERNAL_REF, BALANCE;
 
     val isRequired: Boolean
         get() = this == DATE || this == DESCRIPTION || this == AMOUNT ||
@@ -26,6 +26,7 @@ enum class ImportColumn {
             ACCOUNT -> "account"
             CATEGORY -> "category"
             EXTERNAL_REF -> "external reference"
+            BALANCE -> "balance"
         }
 }
 
@@ -38,7 +39,11 @@ object ImportSchema {
         ImportColumn.DIRECTION to setOf("direction", "type"),
         ImportColumn.ACCOUNT to setOf("account"),
         ImportColumn.CATEGORY to setOf("category"),
-        ImportColumn.EXTERNAL_REF to setOf("external_ref", "reference", "transaction_id")
+        ImportColumn.EXTERNAL_REF to setOf("external_ref", "reference", "transaction_id"),
+        ImportColumn.BALANCE to setOf(
+            "balance", "closing_balance", "running_balance", "available_balance",
+            "closing_bal", "balance_amount"
+        )
     )
 
     fun normalizeHeader(raw: String): String =

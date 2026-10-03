@@ -207,7 +207,7 @@ fun MoneyScreen(navController: NavHostController) {
                             modifier = Modifier.weight(1f)
                         )
                         com.prasbin.shadowmoney.presentation.theme.SystemAction(
-                            label = "Import",
+                            label = "IMPORT REAL STATEMENT",
                             onClick = { navController.navigate(Screen.Import.route) },
                             accent = NeonCyan,
                             modifier = Modifier.weight(1f)

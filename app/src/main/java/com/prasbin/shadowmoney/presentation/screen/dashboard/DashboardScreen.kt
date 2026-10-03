@@ -288,7 +288,7 @@ private fun QuickActions(
                 modifier = Modifier.weight(1f)
             )
             SystemAction(
-                label = "Import",
+                label = "IMPORT REAL STATEMENT",
                 onClick = { navController?.navigate(Screen.Import.route) },
                 accent = NeonCyan,
                 modifier = Modifier.weight(1f)
@@ -301,7 +301,7 @@ private fun QuickActions(
                 modifier = Modifier.weight(1f)
             )
             SystemAction(
-                label = "Import CSV",
+                label = "IMPORT REAL STATEMENT",
                 onClick = { navController?.navigate(Screen.Import.route) },
                 accent = NeonCyan,
                 modifier = Modifier.weight(1f)

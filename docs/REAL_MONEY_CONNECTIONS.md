@@ -1,10 +1,11 @@
-# Real-Money Connections — Foundation & Reconciliation
+# Real-Money Connections — Foundation, Reconciliation & Statement Ingestion
 
 Phase documentation for the connection architecture: what official integrations
 actually exist for the target providers, what was built, and what was deliberately
-not built. Status: **foundation complete, reconciliation loop complete, no
-production connection available** — this is an honest limitation of the providers,
-not of the code.
+not built. Status: **foundation complete, reconciliation loop complete, real
+statement ingestion complete (CSV + local PDF → `IMPORTED / USER-PROVIDED`
+evidence), no production connection available** — this is an honest limitation of
+the providers, not of the code.
 
 ## 1. Provider research (official sources, checked 2026-10-03)
 
@@ -48,7 +49,8 @@ REQUIRED decision are in `docs/LIVE_CONNECTIVITY_RESEARCH.md`.
 - **No consumer wallet balance API. No consumer statement/history API.** The status
   API answers "did this merchant-bound payment complete", not "what is in my wallet".
 - Users can export their own statement from the eSewa app — that lands in the app
-  as **IMPORTED** (user-provided) data through the existing CSV import path.
+  as **IMPORTED** (user-provided) data through the statement ingestion path (CSV
+  or local PDF file, source confirmed by the user).
 - **What would be required for payment initiation:** eSewa merchant/partner
   onboarding. For wallet data sync: no such official interface is published.
 
@@ -105,6 +107,15 @@ so a stale row from a previous set can never inflate the original balance.
 Migration verified by a genuine populated v8 → v9 test (legacy rows preserved with
 NULL audit columns, new rows round-trip audit fields).
 
+Database is now **Room schema v10** — additive `MIGRATION_9_10` creates
+`imported_statements` (statement evidence: document name, detected/confirmed
+source, SHA-256, format, period, counts, money in/out, document-reported balance,
+notes, timestamps) and adds a nullable `statementId` column to `transactions` (no
+FK, no index change to existing tables). Legacy rows keep `statementId = NULL`.
+Backup `APP_SCHEMA_VERSION` follows to 10 (with `imported_statements` excluded
+from the payload and cleared on restore — see §6). Verified by a genuine populated
+v9 → v10 migration test plus all pre-existing migration suites re-chained.
+
 UI: `Screen.Connections` (`connections` route) — a SYSTEM → Connections row opens
 the Connections screen with: provider cards (status chip + interface / data-source
 type / balance / transaction / payment / auth / approval facts + supported
@@ -158,22 +169,100 @@ on its date line.
   below the original balance, provenance-split movement, and affected sources.
 - Existing migration tests chained through `MIGRATION_7_8` and `MIGRATION_8_9`.
 
-## 6. Import as a first-class source (evidence stance)
+## 6. Real statement ingestion (evidence stance)
 
-- **SUPPORTED — generic CSV import**: the app's format-agnostic CSV importer
-  accepts user-provided files with a header row and standard columns (date,
-  amount, direction, description). It assumes **no per-provider format**: nothing
-  about Sanima/Global IME/eSewa statement layouts is encoded anywhere, because no
-  provider export format was ever reverse-engineered or claimed. Imported rows are
-  tagged `IMPORTED` (`source = "IMPORT_FILE"`) at the row level and feed the
-  reconciliation loop only through `importedNetChangeMinor` — visible as explained
-  movement, never as verified data.
-- **NOT SUPPORTED — PDF statements**: there is no PDF parser; bank/wallet PDF
-  statements cannot be imported. This is a documented limitation, not a silent
-  failure — no partial or guessed parsing exists.
-- **Provenance is never upgraded**: an imported row stays `IMPORTED` forever, no
-  matter how consistent its numbers are with a connected baseline. Import evidence
-  explains movement; it never makes a source "connected" or a baseline "verified".
+Statement files the user provides are a first-class real-data path: pick a file →
+detect source → parse → read-only preview → duplicate check → confirm → ordinary
+transactions with `IMPORTED / USER-PROVIDED` provenance feeding reconciliation and
+intelligence. This is **PATH 1** from the ranked-paths research (user-mediated
+export → local import). No adapter, no endpoint, no credentials, no network.
+
+### Architecture (new package `data/statements/` + import-layer extensions)
+
+| File | Role |
+|---|---|
+| `StatementModels.kt` | `StatementSource` (`SANIMA` / `GLOBAL_IME` / `ESEWA` / `UNKNOWN`), `StatementFormat` (`CSV` / `PDF`), `StatementImportContext` (document name, source, SHA-256, format, user confirmation note, preview-level row/invalid/duplicate counts), `StatementFailureReason` (incl. `ENCRYPTED_PDF`, `NO_TEXT_EXTRACTED`, `AMBIGUOUS_COLUMNS`) |
+| `StatementSourceDetector.kt` | Content-marker suggestion over the **first 8192 chars only** (lowercased): sanima / global ime|globalime|global smart / esewa|e-sewa; exactly one marker group → that source, 0 or >1 → `UNKNOWN`. **The filename is never an input.** |
+| `StatementParser.kt` | `CsvStatementParser` + `StatementParserRegistry` — universal parse into a `CsvDocument` that flows through the **untouched** `ImportEngine`/`ImportRepository` validation and duplicate pipeline (one ruleset, no second engine) |
+| `PdfTextExtractor.kt` | Bounded text extraction: 5 MB input, 8192 content streams, 4M chars; `/Encrypt` → `ENCRYPTED_PDF` (safe failure, message contains "never asks" — never prompts for banking passwords); FlateDecode (zlib then raw), image codecs skipped (image-only → `NO_TEXT_EXTRACTED`), text-quality ratio ≥ 0.85 else rejected (binary garbage never becomes rows), UTF-16BE ToUnicode CMap applied only when conflict-free, **no OCR** |
+| `PdfStatementTable.kt` | Table reconstruction: header must carry date + description + (debit | credit | amount) — missing → `AMBIGUOUS_COLUMNS`, never guessed; same-line `Td`/`TD`/`Tm` x-moves emit tabs so empty cells are preserved; `Tj` never breaks a line (only `'`/`"` do); TJ kerning gap ≤ -100 → space; tab rows right-padded to the header count, space rows must match exactly; direction from the document (debit → OUTFLOW, credit → INCOME, signed ±, unsigned → empty → visibly invalid); unparsed lines kept for review, capped at 500; repeated headers → note |
+| `StatementSummary.kt` | Preview-level summary (period from valid rows, money in/out from importable rows, document-reported ending balance or `null` — never zero-invented) + `StatementAgeClassifier` (`RECENT` ≤ 31 days from `periodEndMs ?: importedAtMs`, else `OLD`, with "period ended N day(s) ago" detail) |
+
+Import layer: `ImportSchema.ImportColumn.BALANCE` + `ImportRow.rawBalance`/
+`balanceMinor` (malformed balance cell rejects the row visibly — never guessed);
+`ImportEngine.buildPreview(..., defaultAccountId)` assigns accountless PDF rows
+only to the user-chosen per-import default; `ImportRepository.importSelected` kept
+for the paste flow and `importSelectedWithStatement(rows, StatementImportContext?)`
+records `imported_statements` + per-row `statementId` (counts come from
+**preview-level** metadata, never from the selected-row subset); CSV input larger
+than the bound is refused via `CsvStreamReader.readBytesBounded` (`TooLarge` vs
+`ReadError` — the paste path's semantics unchanged).
+
+### Flow
+
+1. **Entry**: `IMPORT REAL STATEMENT` (Money / Dashboard / Transactions / Settings),
+   SAF `OpenDocument` with `text/*` + `application/pdf` mime types (plus paste-CSV,
+   unchanged). Display name from `OpenableColumns`, else fallback.
+2. **Detect**: PDF magic (`%PDF`) → PDF pipeline, else CSV parser. Detection result
+   shown as a **suggestion** on a dedicated source-confirm step (radio rows for
+   Sanima / Global IME / eSewa / Unknown + evidence line + unparsed-line preview).
+   Nothing writes until the user confirms the source.
+3. **Preview**: read-only rows with row states (`NEW` / `POSSIBLE_DUPLICATE` /
+   `INVALID`), statement evidence panel (period, counts, money in/out,
+   `IMPORTED / USER-PROVIDED BALANCE`), account-assignment dropdown when rows lack
+   an account, default selection = importable NEW rows.
+4. **Confirm**: atomic write; `StatementImportContext` stores document name,
+   detected source, confirmed source ("source confirmed by user", or
+   "source confirmed by user — detection was unknown"), SHA-256, format and
+   preview-level counts. Success step shows the evidence + `VIEW RECONCILIATION`.
+5. **Evidence**: `imported_statements` rows render on the Connections screen below
+   the reconciliation panel: age chip (`IMPORTED — RECENT` cyan /
+   `IMPORTED — OLD` amber), `IMPORTED / USER-PROVIDED` chip, source/format/age
+   detail, period, `IMPORTED / USER-PROVIDED BALANCE: NPR X` (or "not stated"),
+   **`CONNECTED BALANCE: NOT AVAILABLE — this file is not a live connection`**,
+   row counts, money in/out, and "evidence only: never merged into connected or
+   verified totals, and never used as a verified baseline".
+
+### Rules enforced
+
+- **Provenance is never upgraded**: imported rows stay `IMPORTED` forever; they
+  feed the reconciliation loop only through `importedNetChangeMinor` (explained
+  movement, never verified data) and never enter `ActualMoney`'s unified total.
+- **Never labelled connected**: no `CONNECTED` / `VERIFIED` claim appears anywhere
+  in the statement path; the Connections evidence panel always shows the
+  `CONNECTED BALANCE: NOT AVAILABLE` line.
+- **Duplicates**: fingerprint-based; re-importing the same document (or rows
+  matching existing ledger rows) surfaces `POSSIBLE_DUPLICATE` for review —
+  never silently skipped. Missing-account rows resolve their fingerprint under the
+  RESOLVED account name after assignment.
+- **Pasted CSV is not a statement**: the paste flow creates no
+  `imported_statements` record (no document, no digest) — only file-picked inputs
+  do.
+- **Source is content + user confirmation**: detection is a suggestion over
+  content markers only; the stored source is whatever the user explicitly
+  confirmed (including `UNKNOWN`).
+
+### Backup limitation (documented)
+
+`imported_statements` is intentionally **excluded from the backup payload** and
+**cleared on restore** (statement evidence is device-local provenance for the
+current install). Consequently `APP_SCHEMA_VERSION` follows the Room version to
+**10**, and strict schema equality rejects backups written by older builds (v9) —
+by design, never a silent partial restore.
+
+### Documented limitations
+
+- **No OCR**: image-only or scanned PDFs report `NO_TEXT_EXTRACTED` honestly.
+- **No provider-specific PDF claims**: no per-provider layout is encoded; exports
+  whose table does not expose date + description + amount are rejected
+  (`AMBIGUOUS_COLUMNS`), and any row the table cannot fit stays visible as an
+  unparsed line — never silently dropped. Actual Sanima/Global IME/eSewa PDF
+  exports have **not** been tested (no real personal statements are used as test
+  fixtures, by policy); support is format-based, not vendor-certified.
+- **Encrypted PDFs** fail safely with a message containing "never asks" — the app
+  never asks for banking passwords and never attempts decryption.
+- **Non-ISO dates inside PDF content** are visibly invalid rows (the ISO-only
+  `ImportDate` rule is unchanged) — surfaced for review, not guessed.
 
 ## 7. Future path (when a provider publishes an official consumer API)
 
@@ -218,3 +307,17 @@ Reconciliation phase (this session):
   empty state, no crashes (logcat clean), no `INTERNET` permission
   (`dumpsys package`), test data cleared afterwards (`pm clear` → pristine first-run
   state restored).
+
+Statement ingestion phase (this session):
+- Tests: **858 / 82 suites / 0 failures / 0 errors** (77 new across 8 new suites —
+  `StatementSourceDetectorTest`, `PdfTextExtractorTest`, `PdfStatementTableTest`,
+  `StatementParserTest`, `StatementSummaryTest`, `ImportedStatementMigrationTest`,
+  `ImportEngineStatementTest`, `ImportRepositoryStatementTest` — plus 5 new
+  statement tests in `ImportTransactionsViewModelTest`, empty-statement fixture,
+  assistant honesty tests, and 7 migration suites re-chained through
+  `MIGRATION_9_10`).
+- Lint: 0 errors / 27 warnings (unchanged). `assembleDebug` + `assembleRelease` OK;
+  `apksigner verify` → v2 scheme, CN=Prasbin Dhungana. KSP schema `10.json` committed.
+- On-device: debug APK installed and cold-launched on the Android 16 emulator
+  (fresh install, `pm clear` first) with zero logcat crashes; physical device
+  (YPA6RWNB7L7HPBRK) remained disconnected this session — honest limitation.

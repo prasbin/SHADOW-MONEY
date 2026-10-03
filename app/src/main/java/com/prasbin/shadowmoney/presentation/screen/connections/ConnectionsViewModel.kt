@@ -20,16 +20,20 @@ import com.prasbin.shadowmoney.data.connections.Provenance
 import com.prasbin.shadowmoney.data.connections.ProviderAvailability
 import com.prasbin.shadowmoney.data.connections.ProviderCatalog
 import com.prasbin.shadowmoney.data.connections.ReconciliationActivity
+import com.prasbin.shadowmoney.data.model.ImportedStatement
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -40,7 +44,16 @@ data class ConnectionsUiState(
     val baselineSummary: BaselineSummary? = null,
     val actualMoney: ActualMoneyView? = null,
     val discrepancy: DiscrepancyResult? = null,
-    val baselineMessage: String? = null
+    val baselineMessage: String? = null,
+    /** Imported statement evidence (IMPORTED / USER-PROVIDED), never merged. */
+    val importedStatements: List<ImportedStatement> = emptyList()
+)
+
+private data class Quadruple<A, B, C, D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
 )
 
 /**
@@ -48,12 +61,15 @@ data class ConnectionsUiState(
  * provider availability, stored connection state, the unified actual-money view,
  * baseline establishment (refuses without connected sources), and the pure
  * reconciliation engine fed with recorded ledger activity since the baseline was
- * set. Never fabricates a connection or a balance.
+ * set. Never fabricates a connection or a balance. Imported statements appear
+ * only as IMPORTED / USER-PROVIDED evidence with their own age labels — they are
+ * never merged into connected or verified figures.
  */
 class ConnectionsViewModel(
     private val repository: ConnectionRepository,
     private val coordinator: ConnectionSyncCoordinator,
     private val activity: ReconciliationActivity? = null,
+    private val importedStatements: Flow<List<ImportedStatement>>? = null,
     private val clock: () -> Long = { System.currentTimeMillis() }
 ) : ViewModel() {
 
@@ -61,13 +77,15 @@ class ConnectionsViewModel(
 
     private val baselineMessage = MutableStateFlow<String?>(null)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<ConnectionsUiState> = combine(
         repository.observeConnections(),
         repository.observeBaselines(),
-        baselineMessage
-    ) { connections, baselines, message ->
-        Triple(connections, baselines, message)
-    }.flatMapLatest { (connections, baselines, message) ->
+        baselineMessage,
+        importedStatements ?: flowOf(emptyList())
+    ) { connections, baselines, message, statements ->
+        Quadruple(connections, baselines, message, statements)
+    }.flatMapLatest { (connections, baselines, message, statements) ->
         val summary = BaselineCalculator.summarize(baselines)
         flow {
             val recorded = if (summary != null && activity != null) {
@@ -75,7 +93,7 @@ class ConnectionsViewModel(
             } else {
                 null
             }
-            emit(buildState(connections, baselines, summary, recorded, message))
+            emit(buildState(connections, baselines, summary, recorded, message, statements))
         }
     }.stateIn(scope, SharingStarted.Eagerly, ConnectionsUiState())
 
@@ -84,7 +102,8 @@ class ConnectionsViewModel(
         baselines: List<BalanceBaseline>,
         summary: BaselineSummary?,
         recorded: ReconciliationActivity.RecordedActivity?,
-        message: String?
+        message: String?,
+        statements: List<ImportedStatement>
     ): ConnectionsUiState {
         val now = clock()
         val sources = connections
@@ -140,7 +159,8 @@ class ConnectionsViewModel(
                     latestVerifiedBalanceMinor = latestVerified
                 )
             ),
-            baselineMessage = message
+            baselineMessage = message,
+            importedStatements = statements
         )
     }
 

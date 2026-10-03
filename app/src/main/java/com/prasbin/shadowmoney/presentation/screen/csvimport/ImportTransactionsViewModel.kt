@@ -11,6 +11,15 @@ import com.prasbin.shadowmoney.data.imports.ImportReference
 import com.prasbin.shadowmoney.data.imports.ImportRepository
 import com.prasbin.shadowmoney.data.imports.ImportRowState
 import com.prasbin.shadowmoney.data.imports.PreviewOutcome
+import com.prasbin.shadowmoney.data.imports.StatementImportContext
+import com.prasbin.shadowmoney.data.statements.StatementDetection
+import com.prasbin.shadowmoney.data.statements.StatementFormat
+import com.prasbin.shadowmoney.data.statements.StatementHash
+import com.prasbin.shadowmoney.data.statements.StatementInput
+import com.prasbin.shadowmoney.data.statements.StatementParseOutcome
+import com.prasbin.shadowmoney.data.statements.StatementParserRegistry
+import com.prasbin.shadowmoney.data.statements.StatementSource
+import com.prasbin.shadowmoney.data.statements.StatementSummary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,13 +31,31 @@ import kotlinx.coroutines.launch
 /**
  * Explicit import state machine. No database write ever happens before the
  * user triggers [confirmImport] with an explicit selection.
+ *
+ * Real statement ingestion (CSV or PDF picked through SAF): the file's own
+ * content decides the format, the detected provider is only a suggestion the
+ * user confirms, and a confirmed file import records IMPORTED / USER-PROVIDED
+ * statement evidence. Pasted CSV keeps the original paste flow without a
+ * statement document.
  */
 sealed interface ImportUiState {
-    /** Step 1: choose a CSV source (paste or SAF file). */
+    /** Step 1: choose a statement file (CSV or PDF) or paste CSV text. */
     data object Source : ImportUiState
 
     /** Parsing / reference loading in progress. */
     data object Loading : ImportUiState
+
+    /**
+     * File parsed: show content-based source detection and ask the user to
+     * confirm or change the provider. Nothing is labelled connected.
+     */
+    data class SourceConfirm(
+        val detection: StatementDetection,
+        val documentName: String,
+        val format: StatementFormat,
+        val unparsedLines: List<String>,
+        val notes: List<String>
+    ) : ImportUiState
 
     /** Read-only preview: counts, rows, duplicates, unmatched references. */
     data class PreviewReady(
@@ -39,12 +66,20 @@ sealed interface ImportUiState {
         val accountMappings: Map<String, Long>,
         val categoryMappings: Map<String, Long>,
         val accountLabels: Map<String, String>,
-        val categoryLabels: Map<String, String>
+        val categoryLabels: Map<String, String>,
+        val statement: SourceConfirm? = null,
+        val statementProviderLabel: String? = null,
+        val summary: StatementSummary? = null,
+        val defaultAccountId: Long? = null
     ) : ImportUiState {
         val selectedImportableCount: Int
             get() = preview.rows.count {
                 selections[it.rowNumber] == true && it.isImportable()
             }
+
+        /** Statement rows carry no account column; one must be assigned. */
+        val needsAccountAssignment: Boolean
+            get() = preview.rows.any { it.rawAccount.isEmpty() }
     }
 
     /** Input rejected before a preview (missing/unreadable header, missing columns). */
@@ -61,7 +96,10 @@ sealed interface ImportUiState {
         val totalRows: Int,
         val importedCount: Int,
         val skippedCount: Int,
-        val invalidCount: Int
+        val invalidCount: Int,
+        val statementId: Long? = null,
+        val statementDocumentName: String? = null,
+        val statementProviderLabel: String? = null
     ) : ImportUiState
 
     data class Error(val message: String) : ImportUiState
@@ -83,7 +121,10 @@ class ImportTransactionsViewModel(
     private var categoryMappings: Map<String, Long> = emptyMap()
     private var accountLabels: Map<String, String> = emptyMap()
     private var categoryLabels: Map<String, String> = emptyMap()
+    private var statementMeta: StatementMeta? = null
+    private var defaultAccountId: Long? = null
 
+    /** Pasted CSV text: no statement document, original preview flow. */
     fun submitCsv(text: String) {
         if (text.isBlank()) {
             _state.value = ImportUiState.EmptyInput
@@ -97,6 +138,8 @@ class ImportTransactionsViewModel(
             )
             return
         }
+        statementMeta = null
+        defaultAccountId = null
         _state.value = ImportUiState.Loading
         scope.launch {
             runCatching {
@@ -129,6 +172,132 @@ class ImportTransactionsViewModel(
                 }
             )
         }
+    }
+
+    /**
+     * Real statement file (CSV or PDF) picked through SAF. Content decides
+     * the format — a "statement.pdf" that is really CSV parses as CSV. The
+     * parsed result is held read-only until the user confirms the source.
+     */
+    fun submitStatementBytes(bytes: ByteArray, documentName: String) {
+        if (bytes.isEmpty()) {
+            _state.value = ImportUiState.EmptyInput
+            return
+        }
+        if (bytes.size > maxInputBytes) {
+            _state.value = ImportUiState.Error(
+                "Import input exceeds the ${maxInputBytes / (1024 * 1024)} MB limit"
+            )
+            return
+        }
+        statementMeta = null
+        defaultAccountId = null
+        _state.value = ImportUiState.Loading
+        scope.launch {
+            runCatching {
+                val isPdf = bytes.copyOfRange(0, minOf(bytes.size, 5))
+                    .contentEquals("%PDF-".toByteArray(Charsets.ISO_8859_1))
+                val input = if (isPdf) {
+                    StatementInput.PdfDocument(bytes = bytes, documentName = documentName)
+                } else {
+                    StatementInput.TextDocument(
+                        text = String(bytes, Charsets.UTF_8),
+                        documentName = documentName,
+                        format = StatementFormat.CSV
+                    )
+                }
+                val outcome = StatementParserRegistry.parserFor(input.format).parse(input)
+                when (outcome) {
+                    is StatementParseOutcome.Failed -> StatementWork.Failed(outcome.failure.userMessage)
+                    is StatementParseOutcome.Parsed -> StatementWork.Parsed(
+                        result = outcome.result,
+                        referenceData = repository.loadReference()
+                    )
+                }
+            }.fold(
+                onSuccess = { work ->
+                    when (work) {
+                        is StatementWork.Failed -> _state.value =
+                            ImportUiState.Error(work.message)
+                        is StatementWork.Parsed -> {
+                            document = work.result.document
+                            reference = work.referenceData
+                            accountMappings = emptyMap()
+                            categoryMappings = emptyMap()
+                            accountLabels = emptyMap()
+                            categoryLabels = emptyMap()
+                            statementMeta = StatementMeta(
+                                documentName = documentName,
+                                format = work.result.format,
+                                detection = work.result.detection,
+                                unparsedLineCount = work.result.unparsedLines.size,
+                                fileSha256 = StatementHash.sha256Hex(bytes),
+                                confirmedSource = null
+                            )
+                            _state.value = ImportUiState.SourceConfirm(
+                                detection = work.result.detection,
+                                documentName = documentName,
+                                format = work.result.format,
+                                unparsedLines = work.result.unparsedLines,
+                                notes = work.result.notes
+                            )
+                        }
+                    }
+                },
+                onFailure = { error ->
+                    _state.value = ImportUiState.Error(
+                        error.message ?: "Could not read the selected statement"
+                    )
+                }
+            )
+        }
+    }
+
+    /** The user confirmed (or changed) the detected source for this file. */
+    fun confirmSource(source: StatementSource) {
+        val meta = statementMeta ?: return
+        val parsed = document ?: return
+        meta.confirmedSource = source
+        _state.value = ImportUiState.Loading
+        scope.launch {
+            runCatching {
+                val referenceData = reference ?: repository.loadReference()
+                reference = referenceData
+                ImportEngine.buildPreview(
+                    parsed,
+                    referenceData,
+                    accountMappings,
+                    categoryMappings,
+                    defaultAccountId
+                )
+            }.fold(
+                onSuccess = { outcome ->
+                    _state.value = when (outcome) {
+                        is PreviewOutcome.Ready -> {
+                            recordLabels(outcome.preview)
+                            buildPreviewState(outcome.preview)
+                        }
+                        is PreviewOutcome.Empty -> ImportUiState.EmptyInput
+                        is PreviewOutcome.Rejected ->
+                            ImportUiState.PreviewRejected(outcome.reason)
+                    }
+                },
+                onFailure = { error ->
+                    _state.value = ImportUiState.Error(
+                        error.message ?: "Could not build the preview"
+                    )
+                }
+            )
+        }
+    }
+
+    /**
+     * Statement rows without an account column are assigned to one local
+     * account. Rows are never guessed into an account silently.
+     */
+    fun setDefaultAccount(accountId: Long?) {
+        defaultAccountId = accountId
+        recomputePreview()
     }
 
     fun reportSourceError(message: String) {
@@ -178,16 +347,44 @@ class ImportTransactionsViewModel(
         val invalidCount = current.preview.invalidRows
         val validCount = current.preview.validRows
 
+        val meta = statementMeta
+        val statementContext = meta?.let {
+            StatementImportContext(
+                provider = (it.confirmedSource ?: StatementSource.UNKNOWN).storageName,
+                documentName = it.documentName,
+                format = it.format.storageName,
+                detectionEvidence = buildString {
+                    append(it.detection.evidence)
+                    append("; source confirmed by user")
+                    val detected = it.detection.candidate
+                    val confirmed = it.confirmedSource ?: StatementSource.UNKNOWN
+                    if (confirmed != detected) {
+                        append(" (user selected ${confirmed.label} over detected ${detected.label})")
+                    }
+                },
+                fileSha256 = it.fileSha256,
+                unparsedLineCount = it.unparsedLineCount,
+                rowCount = totalRows,
+                invalidRowCount = invalidCount,
+                duplicateRowCount = current.preview.duplicateRows
+            )
+        }
+
         _state.value = ImportUiState.Importing
         scope.launch {
-            runCatching { repository.importSelected(selected) }
+            runCatching { repository.importSelectedWithStatement(selected, statementContext) }
                 .fold(
-                    onSuccess = { importedCount ->
+                    onSuccess = { outcome ->
                         _state.value = ImportUiState.Success(
                             totalRows = totalRows,
-                            importedCount = importedCount,
-                            skippedCount = validCount - importedCount,
-                            invalidCount = invalidCount
+                            importedCount = outcome.importedCount,
+                            skippedCount = validCount - outcome.importedCount,
+                            invalidCount = invalidCount,
+                            statementId = outcome.statementId,
+                            statementDocumentName = statementContext?.documentName,
+                            statementProviderLabel = statementContext?.let {
+                                StatementSource.fromStorage(it.provider).label
+                            }
                         )
                     },
                     onFailure = { error ->
@@ -207,6 +404,8 @@ class ImportTransactionsViewModel(
         categoryMappings = emptyMap()
         accountLabels = emptyMap()
         categoryLabels = emptyMap()
+        statementMeta = null
+        defaultAccountId = null
         _state.value = ImportUiState.Source
     }
 
@@ -220,7 +419,13 @@ class ImportTransactionsViewModel(
         val parsed = document ?: return
         val referenceData = reference ?: return
         runCatching {
-            ImportEngine.buildPreview(parsed, referenceData, accountMappings, categoryMappings)
+            ImportEngine.buildPreview(
+                parsed,
+                referenceData,
+                accountMappings,
+                categoryMappings,
+                defaultAccountId
+            )
         }.fold(
             onSuccess = { outcome ->
                 _state.value = when (outcome) {
@@ -251,8 +456,18 @@ class ImportTransactionsViewModel(
         }
     }
 
-    private fun buildPreviewState(preview: ImportPreview): ImportUiState =
-        ImportUiState.PreviewReady(
+    private fun buildPreviewState(preview: ImportPreview): ImportUiState {
+        val meta = statementMeta
+        val sourceConfirm = meta?.let {
+            ImportUiState.SourceConfirm(
+                detection = it.detection,
+                documentName = it.documentName,
+                format = it.format,
+                unparsedLines = emptyList(),
+                notes = emptyList()
+            )
+        }
+        return ImportUiState.PreviewReady(
             preview = preview,
             selections = defaultSelections(preview),
             accounts = reference?.accounts ?: emptyList(),
@@ -260,8 +475,15 @@ class ImportTransactionsViewModel(
             accountMappings = accountMappings,
             categoryMappings = categoryMappings,
             accountLabels = accountLabels,
-            categoryLabels = categoryLabels
+            categoryLabels = categoryLabels,
+            statement = sourceConfirm,
+            statementProviderLabel = meta?.let {
+                (it.confirmedSource ?: StatementSource.UNKNOWN).label
+            },
+            summary = meta?.let { StatementSummary.from(preview, it.unparsedLineCount) },
+            defaultAccountId = defaultAccountId
         )
+    }
 
     private fun defaultSelections(preview: ImportPreview): Map<Int, Boolean> =
         preview.rows.associate { row ->
@@ -277,5 +499,22 @@ class ImportTransactionsViewModel(
         val parsed: CsvDocument,
         val reference: ImportReference,
         val outcome: PreviewOutcome
+    )
+
+    private sealed interface StatementWork {
+        data class Parsed(
+            val result: com.prasbin.shadowmoney.data.statements.StatementParseResult,
+            val referenceData: ImportReference
+        ) : StatementWork
+        data class Failed(val message: String) : StatementWork
+    }
+
+    private data class StatementMeta(
+        val documentName: String,
+        val format: StatementFormat,
+        val detection: StatementDetection,
+        val unparsedLineCount: Int,
+        val fileSha256: String,
+        var confirmedSource: StatementSource?
     )
 }

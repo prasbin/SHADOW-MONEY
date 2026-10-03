@@ -232,8 +232,8 @@ fun SettingsScreen(navController: androidx.navigation.NavHostController? = null)
 
             com.prasbin.shadowmoney.presentation.theme.SystemSectionHeader("Data")
             com.prasbin.shadowmoney.presentation.theme.SystemListRow(
-                title = "Import transactions (CSV)",
-                subtitle = "Preview, duplicate check, confirm",
+                title = "Import real statement (CSV / PDF)",
+                subtitle = "Content detection, duplicate check, confirm",
                 onClick = { navController?.navigate("import") }
             )
             Spacer(modifier = Modifier.height(8.dp))

@@ -74,6 +74,8 @@ class IntentClassifierTest {
         assertEquals(AssistantIntent.IMPORT, intentOf("import transactions"))
         assertEquals(AssistantIntent.IMPORT, intentOf("how do I paste a CSV?"))
         assertEquals(AssistantIntent.IMPORT, intentOf("importing my bank export"))
+        assertEquals(AssistantIntent.IMPORT, intentOf("how do I import a PDF statement?"))
+        assertEquals(AssistantIntent.IMPORT, intentOf("can this app read a pdf?"))
     }
 
     @Test

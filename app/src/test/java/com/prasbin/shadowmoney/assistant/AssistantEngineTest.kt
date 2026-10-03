@@ -93,6 +93,25 @@ class AssistantEngineTest {
     }
 
     @Test
+    fun balance_neverClaimsABankCurrentlyHoldsMoney() {
+        val fixture = data(accounts = listOf(AssistantAccountInfo("Bank", true, 5_000L)))
+        val all = texts(engine.answer(balanceQuestion(), fixture))
+        assertTrue(all.contains(ASSISTANT_TRUST_LABEL))
+        assertFalse(all.contains("bank currently", ignoreCase = true))
+        assertFalse(all.contains("currently has", ignoreCase = true))
+        assertFalse(all.contains("your bank", ignoreCase = true))
+    }
+
+    @Test
+    fun importText_describesStatementFileIngestionHonestly() {
+        assertTrue(ASSISTANT_IMPORT_TEXT.contains("CSV or PDF"))
+        assertTrue(ASSISTANT_IMPORT_TEXT.contains("IMPORTED / USER-PROVIDED"))
+        assertTrue(ASSISTANT_IMPORT_TEXT.contains("possible-duplicate"))
+        assertTrue(ASSISTANT_IMPORT_TEXT.contains("never starts an import"))
+        assertTrue(ASSISTANT_IMPORT_TEXT.contains("never labeled connected or verified"))
+    }
+
+    @Test
     fun balance_withoutArchivedFlag_neverMentionsArchivedAccounts() {
         val fixture = data(accounts = listOf(AssistantAccountInfo("Bank", true, 5_000L)))
         val response = engine.answer(balanceQuestion(includeArchived = false), fixture)

@@ -24,10 +24,13 @@ const val ASSISTANT_AMBIGUOUS_TEXT =
 const val ASSISTANT_UNSUPPORTED_TEXT =
     "I can answer questions about ${IntentClassifier.TOPICS_TEXT}."
 const val ASSISTANT_IMPORT_TEXT =
-    "CSV imports are local and manual: you pick a file or paste CSV text, review a read-only " +
-        "preview, then confirm. Confirmed rows become normal transactions marked IMPORT_FILE " +
-        "with an optional external reference. Nothing is uploaded, and this assistant never " +
-        "starts an import."
+    "Real statement imports are local and manual: you pick a file (CSV or PDF) or paste CSV " +
+        "text, review a read-only preview, confirm the detected source, then confirm. Confirmed " +
+        "rows become normal transactions marked IMPORT_FILE with IMPORTED / USER-PROVIDED " +
+        "provenance, and a statement evidence record keeps the period, counts and the " +
+        "document's own reported balance — never labeled connected or verified. Importing the " +
+        "same document again shows a possible-duplicate for review instead of silently " +
+        "skipping. Nothing is uploaded, and this assistant never starts an import."
 const val ASSISTANT_GOALS_EMPTY_TEXT = "No goals recorded."
 const val ASSISTANT_WORK_EMPTY_TEXT = "No work items recorded."
 const val ASSISTANT_TELECOM_EMPTY_TEXT = "No telecom records yet."

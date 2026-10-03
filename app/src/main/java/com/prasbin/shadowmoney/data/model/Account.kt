@@ -85,7 +85,9 @@ data class Transaction(
     val createdTimestamp: Long = System.currentTimeMillis(),
     val source: String = "",
     @androidx.room.ColumnInfo(defaultValue = "NULL")
-    val externalRef: String? = null
+    val externalRef: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "NULL")
+    val statementId: Long? = null
 )
 
 @Entity(

@@ -41,6 +41,10 @@ import com.prasbin.shadowmoney.data.connections.MoneyVerificationState
 import com.prasbin.shadowmoney.data.connections.Provenance
 import com.prasbin.shadowmoney.data.connections.ProviderAvailability
 import com.prasbin.shadowmoney.data.connections.label
+import com.prasbin.shadowmoney.data.model.ImportedStatement
+import com.prasbin.shadowmoney.data.statements.StatementAgeClass
+import com.prasbin.shadowmoney.data.statements.StatementAgeClassifier
+import com.prasbin.shadowmoney.data.statements.StatementSource
 import com.prasbin.shadowmoney.presentation.theme.DarkOnSurface
 import com.prasbin.shadowmoney.presentation.theme.DarkOnSurfaceVariant
 import com.prasbin.shadowmoney.presentation.theme.DarkSurface
@@ -72,7 +76,8 @@ fun ConnectionsScreen() {
                 return ConnectionsViewModel(
                     repository = repository,
                     coordinator = ConnectionSyncCoordinator(repository = repository),
-                    activity = LedgerReconciliationActivity(database.transactionDao())
+                    activity = LedgerReconciliationActivity(database.transactionDao()),
+                    importedStatements = database.importedStatementDao().observeAll()
                 ) as T
             }
         }
@@ -130,6 +135,10 @@ fun ConnectionsScreen() {
             Spacer(modifier = Modifier.height(8.dp))
 
             ReconciliationPanel(state)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            SystemSectionHeader("Imported statement evidence")
+            ImportedStatementsPanel(state.importedStatements)
             Spacer(modifier = Modifier.height(8.dp))
 
             SystemSectionHeader("Data provenance")
@@ -478,6 +487,114 @@ private fun reconciliationStatusChip(
     else -> result.state.name.replace('_', ' ')
 }
 
+/**
+ * Imported statement documents as reconciliation evidence. Everything shown
+ * here is IMPORTED / USER-PROVIDED: the age chip is computed from the
+ * document's own period (or its import time), the balance is labelled as the
+ * statement's own reported figure, and nothing is ever merged into the
+ * connected/verified totals above.
+ */
+@Composable
+private fun ImportedStatementsPanel(statements: List<ImportedStatement>) {
+    if (statements.isEmpty()) {
+        SystemPanel(title = "Statements") {
+            Text(
+                text = "No statement imported yet. Use IMPORT REAL STATEMENT to add a " +
+                    "file you provide — it becomes review evidence, never a connection.",
+                style = MaterialTheme.typography.bodySmall,
+                color = DarkOnSurfaceVariant
+            )
+        }
+        return
+    }
+
+    statements.forEach { statement ->
+        SystemPanel(
+            title = statement.documentName.ifBlank { "Imported statement" }
+        ) {
+            val age = StatementAgeClassifier.classify(
+                nowMs = System.currentTimeMillis(),
+                periodEndMs = statement.periodEndMs,
+                importedAtMs = statement.importedAtMs
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SystemChip(
+                    text = age.label,
+                    color = if (age.ageClass == StatementAgeClass.RECENT) NeonCyan else WarningAmber
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                SystemChip(text = "IMPORTED / USER-PROVIDED", color = NeonCyan)
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Source: ${StatementSource.fromStorage(statement.provider).label}" +
+                    " · ${statement.format} · ${age.detail}",
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurface
+            )
+            Text(
+                text = "Period: ${formatStatementDay(statement.periodStartMs)} → " +
+                    formatStatementDay(statement.periodEndMs) +
+                    " · imported ${formatInstant(statement.importedAtMs)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            statement.endBalanceMinor?.let { balance ->
+                Text(
+                    text = "IMPORTED / USER-PROVIDED BALANCE: ${Money.formatNpr(balance)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    color = NeonCyan
+                )
+                Text(
+                    text = "As reported by this document at its period end — not a current balance.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DarkOnSurfaceVariant
+                )
+            } ?: Text(
+                text = "IMPORTED / USER-PROVIDED BALANCE: not stated in this document",
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurfaceVariant
+            )
+            Text(
+                text = "CONNECTED BALANCE: NOT AVAILABLE — this file is not a live connection.",
+                style = MaterialTheme.typography.labelSmall,
+                color = WarningAmber
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Rows: ${statement.rowCount} total · ${statement.transactionCount} imported · " +
+                    "${statement.invalidRowCount} invalid · ${statement.duplicateRowCount} duplicates",
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurface
+            )
+            Text(
+                text = "Money in: ${Money.formatNpr(statement.moneyInMinor)} · " +
+                    "Money out: ${Money.formatNpr(statement.moneyOutMinor)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurface
+            )
+            if (statement.notes.isNotBlank()) {
+                Text(
+                    text = statement.notes,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DarkOnSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Evidence only: never merged into connected or verified totals, " +
+                    "and never used as a verified baseline.",
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
 @Composable
 private fun ProvenancePanel() {
     SystemPanel(title = "Provenance tags") {
@@ -526,6 +643,16 @@ private fun formatInstant(ms: Long): String = java.time.format.DateTimeFormatter
             java.time.ZoneId.of("Asia/Kathmandu")
         )
     )
+
+private fun formatStatementDay(ms: Long?): String =
+    ms?.let {
+        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd").format(
+            java.time.ZonedDateTime.ofInstant(
+                java.time.Instant.ofEpochMilli(it),
+                java.time.ZoneId.of("Asia/Kathmandu")
+            )
+        )
+    } ?: "unknown"
 
 private fun lastSyncLabel(lastVerifiedAtMs: Long?): String =
     lastVerifiedAtMs?.let { formatInstant(it) } ?: "Never — no official consumer interface"

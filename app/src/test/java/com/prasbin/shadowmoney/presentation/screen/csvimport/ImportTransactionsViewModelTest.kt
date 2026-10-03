@@ -7,6 +7,9 @@ import com.prasbin.shadowmoney.data.model.Account
 import com.prasbin.shadowmoney.data.model.Category
 import com.prasbin.shadowmoney.data.model.TRANSACTION_SOURCE_IMPORT_FILE
 import com.prasbin.shadowmoney.data.model.TRANSACTION_DIRECTION_OUTFLOW
+import com.prasbin.shadowmoney.data.statements.StatementFormat
+import com.prasbin.shadowmoney.data.statements.StatementSource
+import com.prasbin.shadowmoney.data.statements.SyntheticPdf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -256,5 +259,162 @@ class ImportTransactionsViewModelTest {
         val state = awaitState(vm) { it is ImportUiState.PreviewReady }
             as ImportUiState.PreviewReady
         assertEquals(1, state.preview.validRows)
+    }
+
+    // ------------------------------------------------------ statement ingestion
+
+    private fun sanimaPdfBytes(): ByteArray = SyntheticPdf.flateCompressed(
+        """
+            BT 72 760 Td (Sanima Bank Limited) Tj 0 -20 Td (Synthetic statement) Tj
+            0 -28 Td (Date) Tj 90 0 Td (Description) Tj 130 0 Td (Debit) Tj
+            80 0 Td (Credit) Tj 80 0 Td (Balance) Tj
+            0 -16 Td (2026-01-05) Tj 90 0 Td (Coffee Shop) Tj 130 0 Td (150.00) Tj
+            80 0 Td () Tj 80 0 Td (10850.00) Tj
+            0 -16 Td (2026-01-06) Tj 90 0 Td (Salary) Tj 130 0 Td () Tj
+            80 0 Td (50000.00) Tj 80 0 Td (60850.00) Tj
+            ET
+        """.trimIndent()
+    )
+
+    @Test
+    fun statementFile_detectsSourceConfirmsThenImportsWithEvidence() = runBlocking {
+        val vm = viewModel()
+        vm.submitStatementBytes(sanimaPdfBytes(), "sanima_jan_2026.pdf")
+        val confirm = awaitState(vm) { it is ImportUiState.SourceConfirm }
+            as ImportUiState.SourceConfirm
+
+        assertEquals(StatementSource.SANIMA, confirm.detection.candidate)
+        assertEquals("sanima_jan_2026.pdf", confirm.documentName)
+        assertEquals(StatementFormat.PDF, confirm.format)
+        assertTrue(confirm.detection.evidence.contains("Sanima"))
+        assertEquals(0, transactionCount())
+
+        vm.confirmSource(StatementSource.SANIMA)
+        val preview = awaitState(vm) { it is ImportUiState.PreviewReady }
+            as ImportUiState.PreviewReady
+
+        assertNotNull(preview.statement)
+        assertEquals("Sanima", preview.statementProviderLabel)
+        assertTrue(preview.needsAccountAssignment)
+        assertNotNull(preview.summary)
+        assertEquals(2, preview.summary!!.totalRows)
+        assertEquals(0, preview.selectedImportableCount)
+
+        vm.setDefaultAccount(1L)
+        val assigned = vm.state.value as ImportUiState.PreviewReady
+        assertEquals(1L, assigned.defaultAccountId)
+        assertEquals(2, assigned.selectedImportableCount)
+        assertEquals(6_085_000L, assigned.summary!!.endBalanceMinor)
+        assertEquals(5_000_000L, assigned.summary!!.moneyInMinor)
+        assertEquals(15_000L, assigned.summary!!.moneyOutMinor)
+
+        vm.confirmImport()
+        val success = awaitState(vm) { it is ImportUiState.Success }
+            as ImportUiState.Success
+        assertEquals(2, success.importedCount)
+        assertEquals("sanima_jan_2026.pdf", success.statementDocumentName)
+        assertEquals("Sanima", success.statementProviderLabel)
+        assertNotNull(success.statementId)
+
+        val statement = database.importedStatementDao().observeAll().first().single()
+        assertEquals("SANIMA", statement.provider)
+        assertEquals("PDF", statement.format)
+        assertEquals(2, statement.transactionCount)
+        assertEquals(6_085_000L, statement.endBalanceMinor)
+        assertTrue(statement.notes.contains("confirmed by user"))
+
+        val transactions = database.transactionDao().getAll().first()
+        assertEquals(2, transactions.size)
+        assertTrue(transactions.all { it.statementId == statement.id })
+    }
+
+    @Test
+    fun statementFile_unknownSource_isStoredOnlyAfterUserConfirmsUnknown() = runBlocking {
+        val genericPdf = SyntheticPdf.simple(
+            """
+                BT 72 760 Td (Generic Export) Tj
+                0 -24 Td (Date) Tj 90 0 Td (Description) Tj 90 0 Td (Debit) Tj
+                0 -16 Td (2026-01-05) Tj 90 0 Td (Coffee) Tj 90 0 Td (150.00) Tj
+                ET
+            """.trimIndent()
+        )
+        val vm = viewModel()
+        vm.submitStatementBytes(genericPdf, "generic.pdf")
+        val confirm = awaitState(vm) { it is ImportUiState.SourceConfirm }
+            as ImportUiState.SourceConfirm
+        assertEquals(StatementSource.UNKNOWN, confirm.detection.candidate)
+
+        vm.confirmSource(StatementSource.UNKNOWN)
+        val preview = awaitState(vm) { it is ImportUiState.PreviewReady }
+            as ImportUiState.PreviewReady
+        vm.setDefaultAccount(1L)
+        vm.confirmImport()
+        val success = awaitState(vm) { it is ImportUiState.Success }
+            as ImportUiState.Success
+        assertEquals(1, success.importedCount)
+        assertEquals("Unknown source", success.statementProviderLabel)
+
+        val statement = database.importedStatementDao().observeAll().first().single()
+        assertEquals("UNKNOWN", statement.provider)
+        assertTrue(statement.notes.contains("no provider markers"))
+    }
+
+    @Test
+    fun statementFile_encryptedPdf_failsSafelyWithoutPasswordPrompt() = runBlocking {
+        val vm = viewModel()
+        vm.submitStatementBytes(
+            SyntheticPdf.simple("BT (secret) Tj ET", encrypt = true),
+            "locked.pdf"
+        )
+        val error = awaitState(vm) { it is ImportUiState.Error }
+            as ImportUiState.Error
+        assertTrue(error.message.contains("password-protected"))
+        assertTrue(error.message.contains("never asks"))
+        assertEquals(0, transactionCount())
+        assertEquals(0, database.importedStatementDao().observeAll().first().size)
+    }
+
+    @Test
+    fun pastedCsv_createsNoStatementEvidence() = runBlocking {
+        val vm = viewModel()
+        vm.submitCsv(validCsv)
+        val preview = awaitState(vm) { it is ImportUiState.PreviewReady }
+            as ImportUiState.PreviewReady
+        assertNull(preview.statement)
+        assertNull(preview.summary)
+
+        vm.confirmImport()
+        val success = awaitState(vm) { it is ImportUiState.Success }
+            as ImportUiState.Success
+        assertNull(success.statementId)
+        assertNull(success.statementDocumentName)
+        assertEquals(1, transactionCount())
+        assertEquals(0, database.importedStatementDao().observeAll().first().size)
+    }
+
+    @Test
+    fun statementFile_secondImportOfSameDocument_showsDuplicateBeforeAnyWrite() = runBlocking {
+        val first = viewModel()
+        first.submitStatementBytes(sanimaPdfBytes(), "sanima_jan_2026.pdf")
+        awaitState(first) { it is ImportUiState.SourceConfirm }
+        first.confirmSource(StatementSource.SANIMA)
+        awaitState(first) { it is ImportUiState.PreviewReady }
+        first.setDefaultAccount(1L)
+        first.confirmImport()
+        awaitState(first) { it is ImportUiState.Success }
+        assertEquals(2, transactionCount())
+
+        val second = viewModel()
+        second.submitStatementBytes(sanimaPdfBytes(), "sanima_jan_2026.pdf")
+        awaitState(second) { it is ImportUiState.SourceConfirm }
+        second.confirmSource(StatementSource.SANIMA)
+        awaitState(second) { it is ImportUiState.PreviewReady }
+        second.setDefaultAccount(1L)
+        val preview = second.state.value as ImportUiState.PreviewReady
+
+        assertEquals(2, preview.preview.duplicateRows)
+        assertEquals(0, preview.selectedImportableCount)
+        assertEquals(2, transactionCount())
+        assertEquals(1, database.importedStatementDao().observeAll().first().size)
     }
 }

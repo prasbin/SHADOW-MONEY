@@ -53,7 +53,9 @@ data class ImportRow(
     val direction: Int?,
     val timestamp: Long?,
     val note: String,
-    val externalRef: String?
+    val externalRef: String?,
+    val rawBalance: String? = null,
+    val balanceMinor: Long? = null
 ) {
     val hasUnmatchedReference: Boolean
         get() = unmatchedAccountName != null || unmatchedCategoryName != null

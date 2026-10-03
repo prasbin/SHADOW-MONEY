@@ -155,7 +155,7 @@ object IntentClassifier {
         "lifetime", "all my life"
     )
 
-    private val IMPORT_TOKENS = setOf("import", "imports", "imported", "importing", "csv")
+    private val IMPORT_TOKENS = setOf("import", "imports", "imported", "importing", "csv", "pdf")
 
     private val NON_MONTHLY_PERIODS = setOf(
         AssistantPeriod.TODAY,

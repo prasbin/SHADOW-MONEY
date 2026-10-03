@@ -140,7 +140,10 @@ Nepal coverage evidence? data handling stated? Press/registry corroboration?
   (Sanima portal Account Statement, Global Smart Plus statement, eSewa app
   statement) and imports it locally. Imported rows keep `IMPORTED` provenance
   forever and feed reconciliation only as explained movement — never as verified
-  data. CSV import is supported; PDF statements are documented as **not parsed**.
+  data. CSV import is supported; PDF statements were documented as **not parsed**
+  at research time — superseded by the subsequent Real Statement Ingestion phase,
+  which added on-device PDF parsing (still `IMPORTED` provenance, never connected;
+  see `docs/REAL_MONEY_CONNECTIONS.md` §6).
 - **Rejected routes (prohibited, not evaluated as options)**: app → bank
   username/password automated login; scraping or reverse-engineering private
   endpoints; certificate-pinning/MFA bypass; OTP/PIN/password capture;

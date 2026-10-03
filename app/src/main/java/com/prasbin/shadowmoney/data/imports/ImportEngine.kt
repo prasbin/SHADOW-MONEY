@@ -38,6 +38,11 @@ data class ImportReference(
  * - OUTFLOW stores the absolute magnitude; a negative amount agrees with the
  *   direction (money leaving), a positive amount is a magnitude.
  * - Zero amounts never become transactions.
+ *
+ * Statement support: rows with an empty account cell may be assigned to
+ * [defaultAccountId] (used by PDF statements that carry no account column),
+ * and an optional balance column is parsed for statement evidence. A
+ * malformed balance cell rejects the row visibly — values are never guessed.
  */
 object ImportEngine {
 
@@ -45,7 +50,8 @@ object ImportEngine {
         document: CsvDocument,
         reference: ImportReference,
         accountMappings: Map<String, Long> = emptyMap(),
-        categoryMappings: Map<String, Long> = emptyMap()
+        categoryMappings: Map<String, Long> = emptyMap(),
+        defaultAccountId: Long? = null
     ): PreviewOutcome {
         document.headerError?.let { return PreviewOutcome.Rejected(it) }
 
@@ -73,7 +79,8 @@ object ImportEngine {
                     reference = reference,
                     accountMappings = accountMappings,
                     categoryMappings = categoryMappings,
-                    seenFingerprints = seenFingerprints
+                    seenFingerprints = seenFingerprints,
+                    defaultAccountId = defaultAccountId
                 )
             )
         }
@@ -102,7 +109,8 @@ object ImportEngine {
         reference: ImportReference,
         accountMappings: Map<String, Long>,
         categoryMappings: Map<String, Long>,
-        seenFingerprints: MutableMap<String, Int>
+        seenFingerprints: MutableMap<String, Int>,
+        defaultAccountId: Long?
     ): ImportRow {
         val reasons = mutableListOf<String>()
 
@@ -124,10 +132,12 @@ object ImportEngine {
         val rawAccount = cell(ImportColumn.ACCOUNT) ?: ""
         val rawCategory = cell(ImportColumn.CATEGORY)
         val rawExternalRef = cell(ImportColumn.EXTERNAL_REF)?.ifEmpty { null }
+        val rawBalance = cell(ImportColumn.BALANCE)?.ifEmpty { null }
 
         var timestamp: Long? = null
         var amountMinor: Long? = null
         var direction: Int? = null
+        var balanceMinor: Long? = null
 
         if (reasons.isEmpty()) {
             when (val dateResult = ImportDate.parse(rawDate)) {
@@ -174,28 +184,40 @@ object ImportEngine {
                 }
             }
 
-            if (rawAccount.isEmpty()) {
+            if (rawAccount.isEmpty() && defaultAccountId == null) {
                 reasons.add("Missing account")
             }
             if (columns.containsKey(ImportColumn.CATEGORY) && rawCategory.isNullOrEmpty()) {
                 reasons.add("Missing category")
+            }
+            if (rawBalance != null) {
+                when (val balanceResult = ImportAmount.parse(rawBalance)) {
+                    is AmountParseResult.Invalid ->
+                        reasons.add("Balance value could not be read: ${balanceResult.reason}")
+                    is AmountParseResult.Ok -> balanceMinor = balanceResult.minorUnits
+                }
             }
         }
 
         val unmatchedAccountName: String?
         var accountId: Long? = null
         val fieldValid = reasons.isEmpty()
-        if (!fieldValid || rawAccount.isEmpty()) {
-            unmatchedAccountName = null
-        } else {
-            val accountKey = ImportFingerprint.normalizeText(rawAccount)
-            val resolved = reference.accountsByName[accountKey]
-                ?: accountMappings[accountKey]?.let { reference.accountsById[it] }
-            if (resolved != null) {
-                accountId = resolved.id
+        when {
+            rawAccount.isEmpty() -> {
                 unmatchedAccountName = null
-            } else {
-                unmatchedAccountName = rawAccount
+                accountId = defaultAccountId
+            }
+            !fieldValid -> unmatchedAccountName = null
+            else -> {
+                val accountKey = ImportFingerprint.normalizeText(rawAccount)
+                val resolved = reference.accountsByName[accountKey]
+                    ?: accountMappings[accountKey]?.let { reference.accountsById[it] }
+                if (resolved != null) {
+                    accountId = resolved.id
+                    unmatchedAccountName = null
+                } else {
+                    unmatchedAccountName = rawAccount
+                }
             }
         }
 
@@ -222,8 +244,16 @@ object ImportEngine {
         var state = ImportRowState.NEW
         var duplicate: DuplicateMatch? = null
         if (reasons.isEmpty()) {
+            // Rows without their own account cell (PDF statements) must
+            // fingerprint under the assigned account's real name so a re-import
+            // of the same statement matches transactions created the first time.
+            val fingerprintAccountName = if (rawAccount.isEmpty()) {
+                accountId?.let { reference.accountsById[it]?.name }.orEmpty()
+            } else {
+                rawAccount
+            }
             val fingerprint = ImportFingerprint.of(
-                accountName = rawAccount,
+                accountName = fingerprintAccountName,
                 timestamp = timestamp!!,
                 amountMinor = amountMinor!!,
                 direction = direction!!,
@@ -279,7 +309,9 @@ object ImportEngine {
             direction = direction,
             timestamp = timestamp,
             note = rawDescription,
-            externalRef = rawExternalRef
+            externalRef = rawExternalRef,
+            rawBalance = rawBalance,
+            balanceMinor = balanceMinor
         )
     }
 }

@@ -4,6 +4,17 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
+**Real Statement Ingestion** ✅ COMPLETE (provider-generated statement files — CSV **and** local PDF — are now a first-class real-data ingestion path: pick a file → detect source → parse → preview → duplicate check → confirm → real transactions with `IMPORTED / USER-PROVIDED` provenance feeding reconciliation and intelligence — **no live connectivity ever claimed, no adapter, no credentials, app stays offline**; **Room schema change: v9 → v10**; version stays `1.0.0` / versionCode 2; full write-up in `docs/REAL_MONEY_CONNECTIONS.md`):
+- **Universal parse → existing engine**: both formats become a `CsvDocument` and flow through the untouched `ImportEngine`/`ImportRepository` validation path — one duplicate/validation pipeline, no second ruleset; pasted-CSV flow unchanged (no statement record); statement evidence is created only for file-picked inputs
+- **PDF parsing on-device (new `data/statements` package)**: `PdfTextExtractor` (5 MB / 8192 stream / 4M char bounds, `/Encrypt` → `ENCRYPTED_PDF` fails safely and never asks for a password, FlateDecode, image-only → `NO_TEXT_EXTRACTED`, text-quality ratio filter, **no OCR**) + `PdfStatementTable` (header must carry date + description + debit/credit/amount — missing → `AMBIGUOUS_COLUMNS`, never guessed; same-line column moves preserve empty cells; unparsed lines kept for review, never silently dropped; non-ISO PDF dates → visibly invalid rows)
+- **Source detection with user confirmation**: content markers (first 8 KB) suggest `Sanima` / `Global IME` / `eSewa` / `UNKNOWN` — filename is never an input; ambiguous/no markers → `UNKNOWN`; the user explicitly confirms on a dedicated review step before any write
+- **Provenance + evidence**: imported rows always `IMPORTED / USER-PROVIDED`; each statement stores its own record (document name, source, SHA-256, period, counts, money in/out, document-reported balance) shown as `IMPORTED / USER-PROVIDED BALANCE` with `IMPORTED — RECENT` / `IMPORTED — OLD` age chips — never merged into connected/verified totals, never called a current balance
+- **Duplicate handling**: second import of the same document shows `POSSIBLE_DUPLICATE` for review before any write — never silently skipped
+- **Connections reconciliation evidence panel**: every stored statement appears below the reconciliation panel with age chip + "period ended N day(s) ago", `CONNECTED BALANCE: NOT AVAILABLE` line, and an explicit "never merged / never a verified baseline" note; assistant `IMPORT` answer rewritten for statements (`ASSISTANT_IMPORT_TEXT`) + `pdf` classified as import intent
+- **Room v10**: additive `MIGRATION_9_10` (`imported_statements` table + `transactions.statementId`, no FK); KSP schema `10.json` committed; backup `APP_SCHEMA_VERSION` follows to 10 — **documented limitation**: `imported_statements` is intentionally excluded from the backup payload and cleared on restore (old v9 backups are rejected by strict schema equality, by design)
+- **Documented limitations**: no OCR; provider-specific PDF layouts not guaranteed to parse (unparsed rows stay visible); encrypted PDFs rejected safely (never asks for banking passwords); imported statements are evidence only — never `CONNECTED`/`VERIFYING`/`VERIFIED`; physical device YPA6RWNB7L7HPBRK disconnected this session (emulator-only smoke)
+- Verification: **858 tests / 82 suites / 0 failures / 0 errors** (77 new across 8 new suites + 5 new ViewModel statement tests); lint **0 errors / 27 warnings**; `assembleDebug` + `assembleRelease` OK (apksigner v2, CN=Prasbin Dhungana)
+
 **Live Financial Connectivity Options Investigation** ✅ COMPLETE (research-only phase — official-source investigation of every legitimate route to real connectivity for Sanima Sajilo eBanking, Global IME Global Smart Plus and eSewa; **no code changes, no schema change — still Room v9**; version stays `1.0.0` / versionCode 2; full write-up in `docs/LIVE_CONNECTIVITY_RESEARCH.md`):
 - **Re-verified provider facts (research date 2026-10-03)**: Sanima and Global IME still publish no developer portal or account-data API (customer portals/apps only; Sanima's only public API work is bank-to-bank INR settlement with Standard Chartered); eSewa's official docs (`developer.esewa.com.np`, fetched directly) are merchant-payment-only — no consumer wallet balance/history API
 - **Capability matrix + aggregator screening**: APINepal and PayBridgeNP are payment gateways (no account data); global aggregators (Plaid/Tink/TrueLayer/Yapily/Fintoc) have zero Nepal coverage; Swippee is a credential-free statement *parser* (Global IME/eSewa yes, Sanima no — optional PDF helper only, statements leave the device); SEO directory pages discarded as authority
@@ -17,7 +28,7 @@ Personal Android financial-management and income-growth application.
 - **Reconciliation loop**: `LedgerReconciliationActivity` aggregates recorded movement since the baseline over one bounded SQL group-by (`netChangeBySourceSince`), split by provenance (verified / imported / manual); `DiscrepancyEngine` now reports original, current, difference, known explained movement, unexplained amount and affected sources — residual 0 → `BALANCE CHANGE EXPLAINED` (flagged `MONEY BELOW ORIGINAL BALANCE` when current < original), residual < 0 → `UNEXPLAINED REDUCTION`, residual > 0 → `UNEXPLAINED INFLOW`
 - **Actual-money tri-state**: `FULLY_VERIFIED` / `PARTIALLY_VERIFIED` / `NOT_AVAILABLE`; failed sources are excluded, counted, and named — never silently counted as zero
 - **Connection-state UI clarity**: reconciliation panel (status chips + figures + connection health), `NO VERIFIED BASELINE AVAILABLE` state, enriched provider cards (`dataSourceType`, `safeNextAction`, supported capabilities, last verification/sync timestamp; eSewa states `MERCHANT API — NOT A PERSONAL WALLET SYNC INTERFACE`)
-- **Import as first-class source (documented evidence stance)**: generic format-agnostic CSV import = `IMPORTED` provenance feeding only `importedNetChangeMinor`; PDF statements explicitly NOT supported; imported never auto-upgrades to connected
+- **Import as first-class source (documented evidence stance)**: generic format-agnostic CSV import = `IMPORTED` provenance feeding only `importedNetChangeMinor`; PDF statements explicitly NOT supported (stance later superseded by the Real Statement Ingestion phase above, which added on-device PDF statement parsing — still `IMPORTED` provenance, never connected); imported never auto-upgrades to connected
 - Verification: **781 tests / 74 suites / 0 failures / 0 errors** (22 new, incl. populated v8 → v9 migration); lint **0 errors / 27 warnings**; `assembleDebug` + `assembleRelease` OK (apksigner v2, CN=Prasbin Dhungana); KSP schema `9.json` committed; backup `APP_SCHEMA_VERSION` follows to 9
 
 **Real Money Connection Foundation** ✅ COMPLETE (provider research + honest connection architecture — no fake connectors, no credentials, app stays offline; **Room schema change: v7 → v8**; version stays `1.0.0` / versionCode 2; full write-up in `docs/REAL_MONEY_CONNECTIONS.md`):
@@ -119,7 +130,7 @@ A practical, local-first opportunity tracking and organization system (manual tr
 - Kotlin
 - Jetpack Compose
 - Material 3 (Dark Theme)
-- Room / SQLite (v9)
+- Room / SQLite (v10)
 - DataStore (preferences)
 - WorkManager
 - Android Storage Access Framework
@@ -163,6 +174,8 @@ Help the user work toward consistently earning at least **NPR 100,000/month**.
 Phase 1 v1 contained only the structural `placeholder` table (no user financial data). Phase 1 → Phase 2 migration (`MIGRATION_1_2`) drops `placeholder` and creates all four entity tables with safe FK actions (`transactions.accountId` RESTRICT, `transactions.categoryId` SET NULL, `goals.accountId` SET NULL; no CASCADE). Verified by genuine v1 → v2 migration tests.
 
 Phase 9 → Phase 10 (`MIGRATION_6_7`) is purely additive: `ALTER TABLE transactions ADD COLUMN externalRef TEXT DEFAULT NULL`. Existing rows keep their data with a NULL reference; no destructive change, no table rebuild. Verified by a genuine populated v6 → v7 migration test.
+
+Phase (Real Statement Ingestion) `MIGRATION_9_10` is purely additive: creates `imported_statements` and adds a nullable `statementId` column to `transactions` (no FK). Legacy rows keep `statementId = NULL`; imported statement evidence lives in its own table. Verified by a genuine populated v9 → v10 migration test plus re-chained pre-existing migration suites.
 
 ## Testing Status
 

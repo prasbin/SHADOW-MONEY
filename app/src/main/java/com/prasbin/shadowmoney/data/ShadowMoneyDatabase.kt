@@ -11,6 +11,7 @@ import com.prasbin.shadowmoney.data.model.Budget
 import com.prasbin.shadowmoney.data.model.Category
 import com.prasbin.shadowmoney.data.model.FinancialConnectionEntity
 import com.prasbin.shadowmoney.data.model.Goal
+import com.prasbin.shadowmoney.data.model.ImportedStatement
 import com.prasbin.shadowmoney.data.model.Opportunity
 import com.prasbin.shadowmoney.data.model.TelecomPackage
 import com.prasbin.shadowmoney.data.model.TelecomSim
@@ -20,8 +21,8 @@ import com.prasbin.shadowmoney.data.model.WorkItem
 import kotlinx.coroutines.flow.Flow
 
 @Database(
-    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class, WorkItem::class, TelecomSim::class, TelecomPackage::class, TelecomSubscription::class, Opportunity::class, FinancialConnectionEntity::class, BalanceBaselineEntity::class],
-    version = 9,
+    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class, WorkItem::class, TelecomSim::class, TelecomPackage::class, TelecomSubscription::class, Opportunity::class, FinancialConnectionEntity::class, BalanceBaselineEntity::class, ImportedStatement::class],
+    version = 10,
     exportSchema = true
 )
 abstract class ShadowMoneyDatabase : RoomDatabase() {
@@ -36,6 +37,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
     abstract fun opportunityDao(): OpportunityDao
     abstract fun backupDao(): BackupDao
     abstract fun connectionDao(): ConnectionDao
+    abstract fun importedStatementDao(): ImportedStatementDao
 
     companion object {
         @Volatile
@@ -50,7 +52,8 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
                 )
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9
+                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+                        MIGRATION_9_10
                     )
                     .build()
                 INSTANCE = instance
@@ -270,5 +273,33 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE `balance_baselines` ADD COLUMN `sourceVerifiedAtMs` INTEGER")
         database.execSQL("ALTER TABLE `balance_baselines` ADD COLUMN `sourceSet` TEXT")
+    }
+}
+
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE `transactions` ADD COLUMN `statementId` INTEGER DEFAULT NULL")
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `imported_statements` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `provider` TEXT NOT NULL,
+                `documentName` TEXT NOT NULL,
+                `format` TEXT NOT NULL,
+                `periodStartMs` INTEGER,
+                `periodEndMs` INTEGER,
+                `endBalanceMinor` INTEGER,
+                `endBalanceAccountId` INTEGER,
+                `importedAtMs` INTEGER NOT NULL,
+                `transactionCount` INTEGER NOT NULL,
+                `moneyInMinor` INTEGER NOT NULL,
+                `moneyOutMinor` INTEGER NOT NULL,
+                `rowCount` INTEGER NOT NULL,
+                `invalidRowCount` INTEGER NOT NULL,
+                `duplicateRowCount` INTEGER NOT NULL,
+                `fileSha256` TEXT,
+                `notes` TEXT NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("CREATE INDEX IF NOT EXISTS `index_imported_statements_fileSha256` ON `imported_statements` (`fileSha256`)")
     }
 }

@@ -1,6 +1,24 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Live Financial Connectivity Options Investigation ✅ COMPLETE
+## Current Status: Real Statement Ingestion ✅ COMPLETE
+
+Provider-generated statement files (CSV **and** local PDF) are now a first-class real-data
+ingestion path: pick a file → detect source → parse → preview → duplicate check → confirm →
+real transactions with `IMPORTED / USER-PROVIDED` provenance feeding reconciliation and
+intelligence (no live connectivity claimed, no adapter, no credentials, app stays offline;
+**schema change v9 → v10**; version stays `1.0.0` / versionCode 2), details in
+`docs/REAL_MONEY_CONNECTIONS.md`:
+- **Universal parse → existing engine**: both formats normalize to a `CsvDocument` and reuse the untouched `ImportEngine`/`ImportRepository` validation and duplicate pipeline; statement evidence is created only for file-picked inputs (pasted CSV unchanged); accountless PDF rows are assigned via an explicit per-import default account before duplicates surface
+- **On-device PDF parsing** (`data/statements`): `PdfTextExtractor` with hard bounds (5 MB / 8192 streams / 4M chars), `/Encrypt` → safe password-free failure, FlateDecode, image-only → `NO_TEXT_EXTRACTED`, text-quality ratio gate, **no OCR**; `PdfStatementTable` requires a real header (date + description + debit/credit/amount — else `AMBIGUOUS_COLUMNS`), preserves empty cells from column moves, keeps unparsed lines visible (capped at 500), never guesses direction
+- **Source detection + confirmation**: content markers (first 8 KB, 1-of-3 match) suggest `Sanima` / `Global IME` / `eSewa`; 0 or >1 matches → `UNKNOWN`; filename never an input; a dedicated review step records the user's explicit confirmation as statement evidence before any write
+- **Provenance + evidence**: imported rows always `IMPORTED / USER-PROVIDED`; `imported_statements` stores document name, source, SHA-256, format, period, counts, money in/out and the document's own reported balance — displayed as `IMPORTED / USER-PROVIDED BALANCE` with `IMPORTED — RECENT` / `IMPORTED — OLD` age chips ("period ended N day(s) ago"), never merged into connected/verified figures
+- **Duplicate handling**: re-importing the same document shows `POSSIBLE_DUPLICATE` for review before any write — never silently skipped
+- **Connections evidence panel + assistant**: statements render below the reconciliation panel with `CONNECTED BALANCE: NOT AVAILABLE` and "never merged / never a verified baseline" notes; assistant `ASSISTANT_IMPORT_TEXT` rewritten for statement ingestion, `pdf` classified as import intent, balance answers re-tested to never claim a bank holds money
+- **Room v10**: additive `MIGRATION_9_10` (`imported_statements` + `transactions.statementId`); KSP schema `10.json` committed; backup `APP_SCHEMA_VERSION` follows to 10 — **documented limitation**: `imported_statements` excluded from the backup payload and cleared on restore; strict schema equality rejects old v9 backups by design
+- **Documented limitations**: no OCR; provider-specific PDF layouts not guaranteed (unparsed rows stay visible); encrypted PDFs fail safely and never prompt for banking passwords; statements are evidence only — never `CONNECTED`; physical device YPA6RWNB7L7HPBRK disconnected this session (emulator-only smoke)
+- Verification: **858 tests / 82 suites / 0 failures / 0 errors** (77 new across 8 new suites + 5 new statement ViewModel tests); lint **0 errors / 27 warnings**; `assembleDebug`/`assembleRelease` OK; `apksigner verify` → v2, CN=Prasbin Dhungana; docs updated, work committed and pushed
+
+Previous status: Live Financial Connectivity Options Investigation ✅ COMPLETE
 
 Research-only phase: official-source investigation of every legitimate route to real
 financial connectivity for Sanima Sajilo eBanking, Global IME Global Smart Plus and
@@ -21,7 +39,7 @@ Audit-grade reconciliation + honest provider-data activation (no fabricated APIs
 - **Reconciliation loop**: `LedgerReconciliationActivity` + bounded `TransactionDao.netChangeBySourceSince` aggregate feed `DiscrepancyEngine` with provenance-split movement (verified / imported / manual) and full figures (original, current, difference, explained, unexplained, affected sources); explained reductions flagged `MONEY BELOW ORIGINAL BALANCE`, residuals reported as `UNEXPLAINED REDUCTION` / `UNEXPLAINED INFLOW`
 - **Actual-money tri-state**: `FULLY_VERIFIED` / `PARTIALLY_VERIFIED` / `NOT_AVAILABLE`; failed sources excluded, counted, never zeroed
 - **Connections UI**: reconciliation panel (status chips, figures, connection health), `NO VERIFIED BASELINE AVAILABLE`, enriched provider cards (`dataSourceType` incl. eSewa `MERCHANT API — NOT A PERSONAL WALLET SYNC INTERFACE`, `safeNextAction`, capabilities, last verification/sync time)
-- **Import evidence stance**: generic CSV importer documented as the only supported import (format-agnostic, no per-provider format assumed); PDF statements documented as NOT supported; imported provenance never upgrades to connected
+- **Import evidence stance**: generic CSV importer documented as the only supported import (format-agnostic, no per-provider format assumed); PDF statements documented as NOT supported (stance later superseded by the Real Statement Ingestion status above — on-device PDF parsing added, still `IMPORTED` provenance, never connected); imported provenance never upgrades to connected
 - Verification: **781 tests / 74 suites / 0 failures / 0 errors** (22 new across 2 new suites + extensions); lint **0 errors / 27 warnings**; `assembleDebug`/`assembleRelease` OK; `apksigner verify` → v2, CN=Prasbin Dhungana; KSP schema `9.json` committed, backup schema version follows to 9; docs updated, work committed and pushed
 
 Previous status: Real Money Connection Foundation ✅ COMPLETE

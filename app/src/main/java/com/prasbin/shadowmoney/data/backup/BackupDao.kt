@@ -83,6 +83,9 @@ interface BackupDao {
     @Query("DELETE FROM transactions")
     suspend fun deleteAllTransactions()
 
+    @Query("DELETE FROM imported_statements")
+    suspend fun deleteAllImportedStatements()
+
     @Query("DELETE FROM goals")
     suspend fun deleteAllGoals()
 
