@@ -39,8 +39,13 @@ class ConnectionRepository(
         return toStore.copy(id = if (toStore.id == 0L) rowId else toStore.id)
     }
 
+    /**
+     * Replaces the whole baseline set atomically (clear + insert in one transaction):
+     * the stored set is always exactly the sources used for the current original
+     * balance, never a union with a previous set.
+     */
     suspend fun setBaselines(baselines: List<BalanceBaseline>) {
-        baselines.forEach { connectionDao.upsertBaseline(it.toEntity()) }
+        connectionDao.replaceBaselines(baselines.map { it.toEntity() })
     }
 
     suspend fun clearBaselines() = connectionDao.clearBaselines()

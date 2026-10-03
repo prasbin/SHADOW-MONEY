@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.prasbin.shadowmoney.data.model.BalanceBaselineEntity
 import com.prasbin.shadowmoney.data.model.FinancialConnectionEntity
 import kotlinx.coroutines.flow.Flow
@@ -34,6 +35,16 @@ interface ConnectionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertBaseline(entity: BalanceBaselineEntity): Long
+
+    /**
+     * Atomically replaces the entire baseline set so a previous set with more
+     * sources can never linger and inflate the original balance.
+     */
+    @Transaction
+    suspend fun replaceBaselines(baselines: List<BalanceBaselineEntity>) {
+        clearBaselines()
+        baselines.forEach { upsertBaseline(it) }
+    }
 
     @Query("DELETE FROM balance_baselines")
     suspend fun clearBaselines()

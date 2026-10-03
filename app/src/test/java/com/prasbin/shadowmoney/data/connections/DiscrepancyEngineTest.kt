@@ -1,7 +1,9 @@
 package com.prasbin.shadowmoney.data.connections
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Every discrepancy state, exercised on the pure engine with controlled inputs. */
@@ -90,7 +92,7 @@ class DiscrepancyEngineTest {
                 connectedSourceCount = 1,
                 status = ConnectionStatus.CONNECTED,
                 baselineMinor = 100_000L,
-                recordedNetChangeMinor = -20_000L,
+                verifiedNetChangeMinor = -20_000L,
                 latestVerifiedBalanceMinor = 80_000L
             )
         )
@@ -105,7 +107,7 @@ class DiscrepancyEngineTest {
                 connectedSourceCount = 1,
                 status = ConnectionStatus.CONNECTED,
                 baselineMinor = 100_000L,
-                recordedNetChangeMinor = -10_000L,
+                verifiedNetChangeMinor = -10_000L,
                 latestVerifiedBalanceMinor = 70_000L
             )
         )
@@ -120,7 +122,7 @@ class DiscrepancyEngineTest {
                 connectedSourceCount = 2,
                 status = ConnectionStatus.CONNECTED,
                 baselineMinor = 100_000L,
-                recordedNetChangeMinor = 0L,
+                verifiedNetChangeMinor = 0L,
                 latestVerifiedBalanceMinor = 115_000L
             )
         )
@@ -155,5 +157,98 @@ class DiscrepancyEngineTest {
             ),
             DiscrepancyState.entries
         )
+    }
+
+    @Test
+    fun explainedReductionBelowOriginal_isExpectedChangeAndFlaggedBelowOriginal() {
+        val result = DiscrepancyEngine.evaluate(
+            DiscrepancyInput(
+                connectedSourceCount = 1,
+                status = ConnectionStatus.CONNECTED,
+                baselineMinor = 100_000L,
+                verifiedNetChangeMinor = -20_000L,
+                latestVerifiedBalanceMinor = 80_000L
+            )
+        )
+        assertEquals(DiscrepancyState.EXPECTED_CHANGE, result.state)
+        assertTrue(result.belowOriginalBalance)
+        assertTrue(result.isExplained)
+        assertEquals(100_000L, result.originalMinor)
+        assertEquals(80_000L, result.currentMinor)
+        assertEquals(-20_000L, result.differenceMinor)
+        assertEquals(-20_000L, result.explainedMovementMinor)
+        assertEquals(0L, result.unexplainedMinor)
+    }
+
+    @Test
+    fun importedAndManualMovement_bothExplainTheDifference() {
+        val result = DiscrepancyEngine.evaluate(
+            DiscrepancyInput(
+                connectedSourceCount = 1,
+                status = ConnectionStatus.CONNECTED,
+                baselineMinor = 100_000L,
+                verifiedNetChangeMinor = -5_000L,
+                importedNetChangeMinor = -10_000L,
+                manualNetChangeMinor = -5_000L,
+                latestVerifiedBalanceMinor = 80_000L
+            )
+        )
+        assertEquals(DiscrepancyState.EXPECTED_CHANGE, result.state)
+        assertEquals(-20_000L, result.explainedMovementMinor)
+        assertEquals(0L, result.unexplainedMinor)
+    }
+
+    @Test
+    fun unexplainedReduction_fillsReconciliationFigures() {
+        val result = DiscrepancyEngine.evaluate(
+            DiscrepancyInput(
+                connectedSourceCount = 1,
+                status = ConnectionStatus.CONNECTED,
+                baselineMinor = 100_000L,
+                verifiedNetChangeMinor = -10_000L,
+                latestVerifiedBalanceMinor = 70_000L
+            )
+        )
+        assertEquals(DiscrepancyState.UNEXPLAINED_REDUCTION, result.state)
+        assertEquals(100_000L, result.originalMinor)
+        assertEquals(70_000L, result.currentMinor)
+        assertEquals(-30_000L, result.differenceMinor)
+        assertEquals(-10_000L, result.explainedMovementMinor)
+        assertEquals(-20_000L, result.unexplainedMinor)
+        assertEquals(-20_000L, result.deltaMinor)
+        assertTrue(result.belowOriginalBalance)
+        assertFalse(result.isExplained)
+    }
+
+    @Test
+    fun affectedProviders_carriedThroughForConnectionStates() {
+        val error = DiscrepancyEngine.evaluate(
+            DiscrepancyInput(
+                connectedSourceCount = 1,
+                status = ConnectionStatus.ERROR,
+                affectedProviders = listOf(Provider.SANIMA, Provider.ESEWA),
+                baselineMinor = 100_000L
+            )
+        )
+        assertEquals(DiscrepancyState.CONNECTION_ERROR, error.state)
+        assertEquals(listOf(Provider.SANIMA, Provider.ESEWA), error.affectedProviders)
+        assertTrue(error.explanation.contains("SANIMA"))
+        assertTrue(error.explanation.contains("ESEWA"))
+    }
+
+    @Test
+    fun sameBalanceWithNoMovement_isExpectedChangeNotDiscrepancy() {
+        val result = DiscrepancyEngine.evaluate(
+            DiscrepancyInput(
+                connectedSourceCount = 1,
+                status = ConnectionStatus.CONNECTED,
+                baselineMinor = 100_000L,
+                latestVerifiedBalanceMinor = 100_000L
+            )
+        )
+        assertEquals(DiscrepancyState.EXPECTED_CHANGE, result.state)
+        assertEquals(0L, result.deltaMinor)
+        assertFalse(result.belowOriginalBalance)
+        assertTrue(result.isExplained)
     }
 }

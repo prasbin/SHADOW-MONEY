@@ -18,6 +18,8 @@ data class ProviderAvailability(
     val provider: Provider,
     val displayName: String,
     val officialInterface: String,
+    val dataSourceType: String,
+    val safeNextAction: String,
     val balanceRead: String,
     val transactionRead: String,
     val paymentInitiate: String,
@@ -26,7 +28,15 @@ data class ProviderAvailability(
     val status: ConnectionStatus,
     val note: String,
     val capabilities: Set<ConnectionCapability> = emptySet()
-)
+) {
+    /** Honest supported-capabilities line; never implies availability of a connection. */
+    fun supportedCapabilitiesLabel(): String =
+        if (capabilities.isEmpty()) {
+            "Supported: none — no data interface available"
+        } else {
+            "Supported: ${capabilities.joinToString(", ") { it.name }}"
+        }
+}
 
 object ProviderCatalog {
 
@@ -42,6 +52,9 @@ object ProviderCatalog {
         provider = Provider.SANIMA,
         displayName = "Sanima Sajilo eBanking",
         officialInterface = "Customer portals only (internet banking, mobile app). No developer API published.",
+        dataSourceType = "No official consumer data source — customer portals only",
+        safeNextAction = "Check your balance in the Sanima app or internet banking yourself; " +
+            "no account-data API exists to connect here.",
         balanceRead = NOT_AVAILABLE_CONSUMER_API,
         transactionRead = NOT_AVAILABLE_CONSUMER_API,
         paymentInitiate = NOT_AVAILABLE_CONSUMER_API,
@@ -56,6 +69,9 @@ object ProviderCatalog {
         provider = Provider.GLOBAL_IME,
         displayName = "Global IME Global Smart Plus",
         officialInterface = "Customer app and web banking only (Global Smart Plus). No developer API published.",
+        dataSourceType = "No official consumer data source — customer app and web banking only",
+        safeNextAction = "Check your balance in Global Smart Plus yourself; no account-data " +
+            "API exists to connect here.",
         balanceRead = NOT_AVAILABLE_CONSUMER_API,
         transactionRead = NOT_AVAILABLE_CONSUMER_API,
         paymentInitiate = NOT_AVAILABLE_CONSUMER_API,
@@ -70,6 +86,9 @@ object ProviderCatalog {
         provider = Provider.ESEWA,
         displayName = "eSewa",
         officialInterface = "Official public developer docs exist (developer.esewa.com.np) for merchants and partners.",
+        dataSourceType = "MERCHANT API — NOT A PERSONAL WALLET SYNC INTERFACE",
+        safeNextAction = "Merchant integration only; personal wallet balance sync is not " +
+            "offered through official APIs.",
         balanceRead = NOT_AVAILABLE_CONSUMER_API,
         transactionRead = "Merchant payment-status only; no consumer wallet history API published",
         paymentInitiate = "Available to approved merchants (ePay / intent / token flows)",

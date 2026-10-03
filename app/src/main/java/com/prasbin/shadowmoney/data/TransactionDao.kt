@@ -94,4 +94,21 @@ interface TransactionDao {
 
     @Query("SELECT COUNT(*) FROM transactions")
     suspend fun getCount(): Int
+
+    /**
+     * Aggregate net movement (income − outflow) per recorded source since a timestamp.
+     * Bounded by GROUP BY + time window; used by reconciliation to explain the change
+     * from a baseline without loading any transaction rows.
+     */
+    @Query(
+        "SELECT source, COALESCE(SUM(CASE WHEN direction = 0 THEN amountMinor ELSE -amountMinor END), 0) AS netMinor " +
+            "FROM transactions WHERE transactionTimestamp >= :sinceMs GROUP BY source"
+    )
+    suspend fun netChangeBySourceSince(sinceMs: Long): List<SourceNetChangeRow>
 }
+
+/** One aggregate row from [TransactionDao.netChangeBySourceSince]. */
+data class SourceNetChangeRow(
+    val source: String,
+    val netMinor: Long
+)

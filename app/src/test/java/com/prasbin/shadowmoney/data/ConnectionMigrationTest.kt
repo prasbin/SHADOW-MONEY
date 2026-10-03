@@ -160,7 +160,7 @@ class ConnectionMigrationTest {
         Room.databaseBuilder(ctx, ShadowMoneyDatabase::class.java, dbName)
             .addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8
+                MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9
             )
             .allowMainThreadQueries()
             .build()
@@ -288,6 +288,75 @@ class ConnectionMigrationTest {
 
                 val observed = repository.observeConnections().first()
                 assertEquals(1, observed.size)
+            }
+        } finally {
+            database.close()
+        }
+    }
+
+    /** Creates a genuine populated v8 database: v7 data + connection tables + baseline rows. */
+    private fun createV8Database(ctx: android.content.Context) {
+        createV7Database(ctx)
+        val file = ctx.getDatabasePath(dbName)
+        val sqlite = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE)
+        sqlite.execSQL(
+            "CREATE TABLE IF NOT EXISTS `financial_connections` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                "`provider` TEXT NOT NULL,`status` TEXT NOT NULL," +
+                "`capabilities` TEXT NOT NULL,`availabilityNote` TEXT NOT NULL," +
+                "`lastVerifiedAtMs` INTEGER,`verifiedBalanceMinor` INTEGER," +
+                "`updatedAtMs` INTEGER NOT NULL)"
+        )
+        sqlite.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_financial_connections_provider` ON `financial_connections` (`provider`)")
+        sqlite.execSQL(
+            "CREATE TABLE IF NOT EXISTS `balance_baselines` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                "`provider` TEXT NOT NULL,`baselineMinor` INTEGER NOT NULL," +
+                "`provenance` TEXT NOT NULL,`setAtMs` INTEGER NOT NULL)"
+        )
+        sqlite.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_balance_baselines_provider` ON `balance_baselines` (`provider`)")
+        sqlite.execSQL("INSERT INTO financial_connections (provider, status, capabilities, availabilityNote, lastVerifiedAtMs, verifiedBalanceMinor, updatedAtMs) VALUES ('SANIMA', 'CONNECTED', 'BALANCE_READ', 'verified', 7500000, 75000, 7500000)")
+        sqlite.execSQL("INSERT INTO balance_baselines (provider, baselineMinor, provenance, setAtMs) VALUES ('SANIMA', 75000, 'CONNECTED_VERIFIED', 7000000)")
+        sqlite.version = 8
+        sqlite.close()
+    }
+
+    @Test
+    fun migration8To9_preservesBaselineRowsAndAddsNullableAuditColumns() {
+        val ctx = appContext()
+        createV8Database(ctx)
+        val database = openMigrated(ctx)
+        try {
+            runBlocking {
+                val rows = database.connectionDao().getBaselinesOnce()
+                assertEquals(1, rows.size)
+                val legacy = rows.first()
+                assertEquals("SANIMA", legacy.provider)
+                assertEquals(75_000L, legacy.baselineMinor)
+                assertEquals("CONNECTED_VERIFIED", legacy.provenance)
+                assertEquals(7_000_000L, legacy.setAtMs)
+                assertNull(legacy.sourceVerifiedAtMs)
+                assertNull(legacy.sourceSet)
+
+                val connections = database.connectionDao().getConnectionsOnce()
+                assertEquals(1, connections.size)
+                assertEquals(75_000L, connections.first().verifiedBalanceMinor)
+
+                database.connectionDao().upsertBaseline(
+                    com.prasbin.shadowmoney.data.model.BalanceBaselineEntity(
+                        provider = "ESEWA",
+                        baselineMinor = 30_000L,
+                        provenance = "CONNECTED_VERIFIED",
+                        setAtMs = 8_000_000L,
+                        sourceVerifiedAtMs = 7_900_000L,
+                        sourceSet = "ESEWA"
+                    )
+                )
+                val after = database.connectionDao().getBaselinesOnce()
+                assertEquals(2, after.size)
+                val fresh = after.first { it.provider == "ESEWA" }
+                assertEquals(7_900_000L, fresh.sourceVerifiedAtMs)
+                assertEquals("ESEWA", fresh.sourceSet)
             }
         } finally {
             database.close()

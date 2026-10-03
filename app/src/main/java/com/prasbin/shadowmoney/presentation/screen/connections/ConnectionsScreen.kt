@@ -35,6 +35,9 @@ import com.prasbin.shadowmoney.data.connections.ConnectionRepository
 import com.prasbin.shadowmoney.data.connections.ConnectionStatus
 import com.prasbin.shadowmoney.data.connections.ConnectionSyncCoordinator
 import com.prasbin.shadowmoney.data.connections.DiscrepancyState
+import com.prasbin.shadowmoney.data.connections.FinancialConnection
+import com.prasbin.shadowmoney.data.connections.LedgerReconciliationActivity
+import com.prasbin.shadowmoney.data.connections.MoneyVerificationState
 import com.prasbin.shadowmoney.data.connections.Provenance
 import com.prasbin.shadowmoney.data.connections.ProviderAvailability
 import com.prasbin.shadowmoney.data.connections.label
@@ -68,7 +71,8 @@ fun ConnectionsScreen() {
                 val repository = ConnectionRepository(database.connectionDao())
                 return ConnectionsViewModel(
                     repository = repository,
-                    coordinator = ConnectionSyncCoordinator(repository = repository)
+                    coordinator = ConnectionSyncCoordinator(repository = repository),
+                    activity = LedgerReconciliationActivity(database.transactionDao())
                 ) as T
             }
         }
@@ -109,9 +113,8 @@ fun ConnectionsScreen() {
             state.providers.forEach { availability ->
                 ProviderCard(
                     availability = availability,
-                    storedStatus = state.connections
+                    storedConnection = state.connections
                         .firstOrNull { it.provider == availability.provider }
-                        ?.status
                 )
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -126,7 +129,7 @@ fun ConnectionsScreen() {
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            DiscrepancyPanel(state)
+            ReconciliationPanel(state)
             Spacer(modifier = Modifier.height(8.dp))
 
             SystemSectionHeader("Data provenance")
@@ -148,9 +151,9 @@ fun ConnectionsScreen() {
 @Composable
 private fun ProviderCard(
     availability: ProviderAvailability,
-    storedStatus: ConnectionStatus?
+    storedConnection: FinancialConnection?
 ) {
-    val status = storedStatus ?: availability.status
+    val status = storedConnection?.status ?: availability.status
     SystemPanel(title = availability.displayName) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SystemChip(
@@ -160,17 +163,31 @@ private fun ProviderCard(
         }
         Spacer(modifier = Modifier.height(8.dp))
         AvailabilityRow("Interface", availability.officialInterface)
+        AvailabilityRow("Data source type", availability.dataSourceType)
         AvailabilityRow("Balance read", availability.balanceRead)
         AvailabilityRow("Transaction read", availability.transactionRead)
         AvailabilityRow("Payment initiate", availability.paymentInitiate)
         AvailabilityRow("Auth model", availability.authModel)
         AvailabilityRow("Approval required", availability.approvalRequired)
+        AvailabilityRow("Last verification/sync", lastSyncLabel(storedConnection?.lastVerifiedAtMs))
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = availability.supportedCapabilitiesLabel(),
+            style = MaterialTheme.typography.labelSmall,
+            color = DarkOnSurfaceVariant
+        )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = availability.note,
             style = MaterialTheme.typography.labelSmall,
             color = WarningAmber,
             fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Next step: ${availability.safeNextAction}",
+            style = MaterialTheme.typography.labelSmall,
+            color = NeonCyan
         )
     }
 }
@@ -195,7 +212,7 @@ private fun AvailabilityRow(label: String, value: String) {
 private fun ActualMoneyPanel(state: ConnectionsUiState) {
     SystemPanel(title = "Actual money") {
         val view = state.actualMoney
-        if (view == null || view.connectedVerifiedTotalMinor == null) {
+        if (view == null || view.state == MoneyVerificationState.NOT_AVAILABLE) {
             Text(
                 text = "NOT AVAILABLE",
                 style = MaterialTheme.typography.titleMedium,
@@ -210,10 +227,17 @@ private fun ActualMoneyPanel(state: ConnectionsUiState) {
                 style = MaterialTheme.typography.bodySmall,
                 color = DarkOnSurfaceVariant
             )
+            if (view != null && view.failedSourceCount > 0) {
+                Text(
+                    text = "${view.failedSourceCount} failed source(s) excluded — never counted as zero.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ErrorRed
+                )
+            }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = Money.formatNpr(view.connectedVerifiedTotalMinor),
+                    text = Money.formatNpr(view.connectedVerifiedTotalMinor!!),
                     style = MaterialTheme.typography.titleMedium,
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
@@ -221,14 +245,23 @@ private fun ActualMoneyPanel(state: ConnectionsUiState) {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 SystemChip(
-                    text = if (view.isFullyVerified) "VERIFIED" else "PARTIALLY VERIFIED",
-                    color = if (view.isFullyVerified) NeonGreen else WarningAmber
+                    text = when (view.state) {
+                        MoneyVerificationState.FULLY_VERIFIED -> "FULLY VERIFIED"
+                        MoneyVerificationState.PARTIALLY_VERIFIED -> "PARTIALLY VERIFIED"
+                        MoneyVerificationState.NOT_AVAILABLE -> "NOT AVAILABLE"
+                    },
+                    color = when (view.state) {
+                        MoneyVerificationState.FULLY_VERIFIED -> NeonGreen
+                        MoneyVerificationState.PARTIALLY_VERIFIED -> WarningAmber
+                        MoneyVerificationState.NOT_AVAILABLE -> WarningAmber
+                    }
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "${view.freshSourceCount} fresh · ${view.staleSourceCount} stale · " +
-                    "${view.unverifiedSourceCount} unverified of ${view.connectedSourceCount} connected",
+                    "${view.unverifiedSourceCount} unverified · ${view.failedSourceCount} failed " +
+                    "of ${view.connectedSourceCount} connected",
                 style = MaterialTheme.typography.labelSmall,
                 color = DarkOnSurfaceVariant
             )
@@ -257,24 +290,45 @@ private fun BaselinePanel(
     onSetBaseline: () -> Unit
 ) {
     SystemPanel(title = "Baseline") {
-        if (state.baselines.isEmpty()) {
+        val summary = state.baselineSummary
+        if (summary == null) {
             Text(
-                text = "NO BASELINE",
+                text = "NO VERIFIED BASELINE AVAILABLE",
                 style = MaterialTheme.typography.titleMedium,
                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 color = WarningAmber
             )
         } else {
-            state.baselines.forEach { baseline ->
+            Text(
+                text = "ORIGINAL BALANCE",
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurfaceVariant
+            )
+            Text(
+                text = Money.formatNpr(summary.originalBalanceMinor),
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                color = NeonGreen
+            )
+            Text(
+                text = "Sources: ${summary.sourceSet.joinToString(", ") { it.name }} · " +
+                    "set ${formatInstant(summary.setAtMs)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = DarkOnSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            summary.rows.forEach { baseline ->
                 Text(
                     text = "${baseline.provider.name} · ${Money.formatNpr(baseline.baselineMinor)}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    color = NeonGreen
+                    color = DarkOnSurface
                 )
                 Text(
-                    text = "${baseline.provenance.label()} · set ${baseline.setAtMs}",
+                    text = "${baseline.provenance.label()} · verified " +
+                        (baseline.sourceVerifiedAtMs?.let { formatInstant(it) } ?: "—"),
                     style = MaterialTheme.typography.labelSmall,
                     color = DarkOnSurfaceVariant
                 )
@@ -290,15 +344,15 @@ private fun BaselinePanel(
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
-                color = if (state.baselines.isEmpty()) WarningAmber else NeonGreen
+                color = if (state.baselineSummary == null) WarningAmber else NeonGreen
             )
         }
     }
 }
 
 @Composable
-private fun DiscrepancyPanel(state: ConnectionsUiState) {
-    SystemPanel(title = "Discrepancy") {
+private fun ReconciliationPanel(state: ConnectionsUiState) {
+    SystemPanel(title = "Reconciliation") {
         val result = state.discrepancy
         if (result == null) {
             Text(
@@ -308,28 +362,120 @@ private fun DiscrepancyPanel(state: ConnectionsUiState) {
             )
             return@SystemPanel
         }
+
         Row(verticalAlignment = Alignment.CenterVertically) {
+            state.actualMoney?.let { actual ->
+                SystemChip(
+                    text = when (actual.state) {
+                        MoneyVerificationState.FULLY_VERIFIED -> "ACTUAL MONEY FULLY VERIFIED"
+                        MoneyVerificationState.PARTIALLY_VERIFIED -> "ACTUAL MONEY PARTIALLY VERIFIED"
+                        MoneyVerificationState.NOT_AVAILABLE -> "ACTUAL MONEY NOT AVAILABLE"
+                    },
+                    color = when (actual.state) {
+                        MoneyVerificationState.FULLY_VERIFIED -> NeonGreen
+                        MoneyVerificationState.PARTIALLY_VERIFIED -> WarningAmber
+                        MoneyVerificationState.NOT_AVAILABLE -> WarningAmber
+                    }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
             SystemChip(
-                text = result.state.name.replace('_', ' '),
+                text = reconciliationStatusChip(result),
                 color = discrepancyColor(result.state)
             )
-            result.deltaMinor?.let { delta ->
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Δ ${Money.formatNpr(delta)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    color = discrepancyColor(result.state)
-                )
-            }
         }
         Spacer(modifier = Modifier.height(6.dp))
+
+        if (result.originalMinor == null) {
+            Text(
+                text = "ORIGINAL BALANCE: NO VERIFIED BASELINE AVAILABLE",
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                color = WarningAmber
+            )
+        } else {
+            ReconciliationFigure("Original balance", Money.formatNpr(result.originalMinor))
+            ReconciliationFigure(
+                "Current verified",
+                result.currentMinor?.let { Money.formatNpr(it) } ?: "—"
+            )
+            ReconciliationFigure(
+                "Difference",
+                result.differenceMinor?.let { Money.formatNpr(it) } ?: "—"
+            )
+            ReconciliationFigure(
+                "Known explained movement",
+                result.explainedMovementMinor?.let { Money.formatNpr(it) } ?: "—"
+            )
+            ReconciliationFigure(
+                "Unexplained amount",
+                result.unexplainedMinor?.let { Money.formatNpr(it) } ?: "—",
+                emphasize = true
+            )
+            ReconciliationFigure(
+                "Affected source(s)",
+                if (result.affectedProviders.isEmpty()) "—"
+                else result.affectedProviders.joinToString(", ") { it.name }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "EXPLANATION",
+            style = MaterialTheme.typography.labelSmall,
+            color = DarkOnSurfaceVariant
+        )
         Text(
             text = result.explanation,
             style = MaterialTheme.typography.bodySmall,
+            color = DarkOnSurface
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "CONNECTION HEALTH",
+            style = MaterialTheme.typography.labelSmall,
             color = DarkOnSurfaceVariant
         )
+        Text(
+            text = "${state.connections.count { it.status == ConnectionStatus.CONNECTED }} connected · " +
+                "${state.connections.count { it.status == ConnectionStatus.STALE }} stale · " +
+                "${state.connections.count { it.status == ConnectionStatus.ERROR }} error · " +
+                "${state.connections.count { it.status == ConnectionStatus.REAUTH_REQUIRED }} reauth",
+            style = MaterialTheme.typography.labelSmall,
+            color = DarkOnSurface
+        )
     }
+}
+
+@Composable
+private fun ReconciliationFigure(label: String, value: String, emphasize: Boolean = false) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = DarkOnSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontWeight = if (emphasize) FontWeight.Bold else FontWeight.Normal,
+            color = if (emphasize) ErrorRed else DarkOnSurface
+        )
+    }
+}
+
+private fun reconciliationStatusChip(
+    result: com.prasbin.shadowmoney.data.connections.DiscrepancyResult
+): String = when {
+    result.belowOriginalBalance && !result.isExplained &&
+        result.state == DiscrepancyState.UNEXPLAINED_REDUCTION -> "UNEXPLAINED REDUCTION"
+    result.belowOriginalBalance && result.isExplained -> "MONEY BELOW ORIGINAL BALANCE"
+    else -> result.state.name.replace('_', ' ')
 }
 
 @Composable
@@ -371,6 +517,18 @@ private fun ProvenanceRow(provenance: Provenance, definition: String) {
         )
     }
 }
+
+private fun formatInstant(ms: Long): String = java.time.format.DateTimeFormatter
+    .ofPattern("yyyy-MM-dd HH:mm")
+    .format(
+        java.time.ZonedDateTime.ofInstant(
+            java.time.Instant.ofEpochMilli(ms),
+            java.time.ZoneId.of("Asia/Kathmandu")
+        )
+    )
+
+private fun lastSyncLabel(lastVerifiedAtMs: Long?): String =
+    lastVerifiedAtMs?.let { formatInstant(it) } ?: "Never — no official consumer interface"
 
 private fun statusLabel(status: ConnectionStatus): String = when (status) {
     ConnectionStatus.UNAVAILABLE -> "UNAVAILABLE"

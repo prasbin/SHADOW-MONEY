@@ -4,6 +4,14 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
+**Real Money Reconciliation & Provider Data Activation** ✅ COMPLETE (audit-grade reconciliation + honest provider-data activation — no fabricated APIs, no credentials, app stays offline; **Room schema change: v8 → v9**; version stays `1.0.0` / versionCode 2; full write-up in `docs/REAL_MONEY_CONNECTIONS.md`):
+- **Baseline is reproducible and auditable**: original balance = deterministic sum of stored per-source rows (`BaselineCalculator.summarize`), each row carrying `sourceVerifiedAtMs` + `sourceSet` audit fields (nullable columns via additive `MIGRATION_8_9`); fixed the `firstOrNull()?.baselineMinor` bug that treated the first row as the whole original balance; `ConnectionDao.replaceBaselines` (`@Transaction`) makes baseline replacement atomic — a stale row from a previous set can never inflate the sum
+- **Reconciliation loop**: `LedgerReconciliationActivity` aggregates recorded movement since the baseline over one bounded SQL group-by (`netChangeBySourceSince`), split by provenance (verified / imported / manual); `DiscrepancyEngine` now reports original, current, difference, known explained movement, unexplained amount and affected sources — residual 0 → `BALANCE CHANGE EXPLAINED` (flagged `MONEY BELOW ORIGINAL BALANCE` when current < original), residual < 0 → `UNEXPLAINED REDUCTION`, residual > 0 → `UNEXPLAINED INFLOW`
+- **Actual-money tri-state**: `FULLY_VERIFIED` / `PARTIALLY_VERIFIED` / `NOT_AVAILABLE`; failed sources are excluded, counted, and named — never silently counted as zero
+- **Connection-state UI clarity**: reconciliation panel (status chips + figures + connection health), `NO VERIFIED BASELINE AVAILABLE` state, enriched provider cards (`dataSourceType`, `safeNextAction`, supported capabilities, last verification/sync timestamp; eSewa states `MERCHANT API — NOT A PERSONAL WALLET SYNC INTERFACE`)
+- **Import as first-class source (documented evidence stance)**: generic format-agnostic CSV import = `IMPORTED` provenance feeding only `importedNetChangeMinor`; PDF statements explicitly NOT supported; imported never auto-upgrades to connected
+- Verification: **781 tests / 74 suites / 0 failures / 0 errors** (22 new, incl. populated v8 → v9 migration); lint **0 errors / 27 warnings**; `assembleDebug` + `assembleRelease` OK (apksigner v2, CN=Prasbin Dhungana); KSP schema `9.json` committed; backup `APP_SCHEMA_VERSION` follows to 9
+
 **Real Money Connection Foundation** ✅ COMPLETE (provider research + honest connection architecture — no fake connectors, no credentials, app stays offline; **Room schema change: v7 → v8**; version stays `1.0.0` / versionCode 2; full write-up in `docs/REAL_MONEY_CONNECTIONS.md`):
 - **Provider research (official sources)**: Sanima Sajilo eBanking → `NOT AVAILABLE THROUGH OFFICIAL PUBLIC CONSUMER API` (customer portals/apps only); Global IME Global Smart Plus → `NOT AVAILABLE THROUGH OFFICIAL PUBLIC CONSUMER API` (bank-owned customer app only); eSewa → `OFFICIAL API EXISTS — MERCHANT PAYMENT CATEGORY; CONSUMER WALLET DATA SYNC NOT AVAILABLE` (`developer.esewa.com.np` is merchant/partner-only)
 - **Connection domain**: `ProviderAdapter` read-only interface with **zero production implementations** (empty adapter map by design), research-backed `ProviderCatalog`, connection/baseline Room persistence, sync coordinator with staleness downgrade, unified actual-money view (connected-verified sources only — manual/imported records stay separately provenanced and are never folded in), baseline establishment that refuses without fresh connected sources, and a pure discrepancy state machine (`NO_CONNECTED_SOURCES` → … → `ACTUAL_DISCREPANCY`)
@@ -103,7 +111,7 @@ A practical, local-first opportunity tracking and organization system (manual tr
 - Kotlin
 - Jetpack Compose
 - Material 3 (Dark Theme)
-- Room / SQLite (v8)
+- Room / SQLite (v9)
 - DataStore (preferences)
 - WorkManager
 - Android Storage Access Framework

@@ -92,10 +92,17 @@ data class NormalizedFinancialSource(
     val verifiedAtMs: Long? = null
 )
 
-/** Baseline established from connected verified sources only. */
+/**
+ * Baseline established from connected verified sources only. Carries its full audit
+ * trail: which source the amount came from ([provider]), the verified reading time
+ * ([sourceVerifiedAtMs]), the creation time ([setAtMs]), and the complete set of
+ * sources used ([sourceSet]) so the original balance is reproducible and auditable.
+ */
 data class BalanceBaseline(
     val provider: Provider,
     val baselineMinor: Long,
     val provenance: Provenance = Provenance.CONNECTED_VERIFIED,
-    val setAtMs: Long
+    val setAtMs: Long,
+    val sourceVerifiedAtMs: Long? = null,
+    val sourceSet: String? = null
 )

@@ -44,7 +44,9 @@ data class BalanceBaselineEntity(
     val provider: String,
     val baselineMinor: Long,
     val provenance: String,
-    val setAtMs: Long
+    val setAtMs: Long,
+    val sourceVerifiedAtMs: Long? = null,
+    val sourceSet: String? = null
 )
 
 fun FinancialConnectionEntity.toDomain(): FinancialConnection = FinancialConnection(
@@ -77,7 +79,9 @@ fun BalanceBaselineEntity.toDomain(): com.prasbin.shadowmoney.data.connections.B
         provider = runCatching { Provider.valueOf(provider) }.getOrDefault(Provider.OTHER),
         baselineMinor = baselineMinor,
         provenance = runCatching { Provenance.valueOf(provenance) }.getOrDefault(Provenance.CONNECTED_VERIFIED),
-        setAtMs = setAtMs
+        setAtMs = setAtMs,
+        sourceVerifiedAtMs = sourceVerifiedAtMs,
+        sourceSet = sourceSet
     )
 
 fun com.prasbin.shadowmoney.data.connections.BalanceBaseline.toEntity(): BalanceBaselineEntity =
@@ -86,5 +90,7 @@ fun com.prasbin.shadowmoney.data.connections.BalanceBaseline.toEntity(): Balance
         provider = provider.name,
         baselineMinor = baselineMinor,
         provenance = provenance.name,
-        setAtMs = setAtMs
+        setAtMs = setAtMs,
+        sourceVerifiedAtMs = sourceVerifiedAtMs,
+        sourceSet = sourceSet
     )

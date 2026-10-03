@@ -321,6 +321,8 @@ class DashboardViewModelTest {
                 flow { throw RuntimeException("Simulated database failure") }
             override suspend fun setWorkItemId(transactionId: Long, workItemId: Long?) =
                 throw RuntimeException("Simulated database failure")
+            override suspend fun netChangeBySourceSince(sinceMs: Long): List<com.prasbin.shadowmoney.data.SourceNetChangeRow> =
+                throw RuntimeException("Simulated database failure")
         }
 
         val viewModel = viewModelWith(

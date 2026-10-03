@@ -44,6 +44,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.prasbin.shadowmoney.data.ShadowMoneyDatabase
+import com.prasbin.shadowmoney.data.backup.APP_SCHEMA_VERSION
 import com.prasbin.shadowmoney.data.backup.BACKUP_CHECKSUM_ALGORITHM
 import com.prasbin.shadowmoney.data.backup.BACKUP_FORMAT_NAME
 import com.prasbin.shadowmoney.data.backup.BACKUP_FORMAT_VERSION
@@ -295,7 +296,7 @@ private fun BackupSection(
                 color = DarkOnSurfaceVariant
             )
             Text(
-                text = "Database schema: v8",
+                text = "Database schema: v$APP_SCHEMA_VERSION",
                 style = MaterialTheme.typography.bodySmall,
                 color = DarkOnSurfaceVariant
             )

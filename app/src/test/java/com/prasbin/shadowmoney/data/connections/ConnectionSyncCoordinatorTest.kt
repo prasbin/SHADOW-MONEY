@@ -335,7 +335,7 @@ class ConnectionSyncCoordinatorTest {
                 connectedSourceCount = sources.size,
                 status = ConnectionStatus.CONNECTED,
                 baselineMinor = baseline.baselineMinor,
-                recordedNetChangeMinor = -20_000L,
+                verifiedNetChangeMinor = -20_000L,
                 latestVerifiedBalanceMinor = 80_000L
             )
         )
@@ -346,11 +346,49 @@ class ConnectionSyncCoordinatorTest {
                 connectedSourceCount = sources.size,
                 status = ConnectionStatus.CONNECTED,
                 baselineMinor = baseline.baselineMinor,
-                recordedNetChangeMinor = -20_000L,
+                verifiedNetChangeMinor = -20_000L,
                 latestVerifiedBalanceMinor = 60_000L
             )
         )
         assertEquals(DiscrepancyState.UNEXPLAINED_REDUCTION, unexplained.state)
         assertEquals(-20_000L, unexplained.deltaMinor)
+    }
+
+    @Test
+    fun setBaselines_replacesPreviousSetSoStaleRowsNeverLinger() = runBlocking {
+        repository.setBaselines(
+            listOf(
+                BalanceBaseline(
+                    provider = Provider.SANIMA,
+                    baselineMinor = 120_000L,
+                    provenance = Provenance.CONNECTED_VERIFIED,
+                    setAtMs = 1_000L
+                ),
+                BalanceBaseline(
+                    provider = Provider.ESEWA,
+                    baselineMinor = 30_000L,
+                    provenance = Provenance.CONNECTED_VERIFIED,
+                    setAtMs = 1_000L
+                )
+            )
+        )
+        assertEquals(2, repository.getBaselinesOnce().size)
+
+        repository.setBaselines(
+            listOf(
+                BalanceBaseline(
+                    provider = Provider.SANIMA,
+                    baselineMinor = 100_000L,
+                    provenance = Provenance.CONNECTED_VERIFIED,
+                    setAtMs = 2_000L
+                )
+            )
+        )
+
+        val rows = repository.getBaselinesOnce()
+        assertEquals(1, rows.size)
+        assertEquals(Provider.SANIMA, rows.first().provider)
+        assertEquals(100_000L, rows.first().baselineMinor)
+        assertEquals(2_000L, rows.first().setAtMs)
     }
 }

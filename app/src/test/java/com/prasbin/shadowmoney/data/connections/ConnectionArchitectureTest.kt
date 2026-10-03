@@ -167,4 +167,42 @@ class ConnectionArchitectureTest {
         assertEquals(null, view.connectedVerifiedTotalMinor)
         assertFalse(view.isFullyVerified)
     }
+
+    @Test
+    fun providerCatalog_enrichmentFieldsArePresentAndHonest() {
+        ProviderCatalog.all().forEach { availability ->
+            assertTrue(availability.dataSourceType.isNotBlank())
+            assertTrue(availability.safeNextAction.isNotBlank())
+            assertTrue(availability.supportedCapabilitiesLabel().startsWith("Supported:"))
+        }
+        listOf(ProviderCatalog.sanima(), ProviderCatalog.globalIme()).forEach { availability ->
+            assertTrue(
+                "no-consumer-source statement expected for ${availability.provider}",
+                availability.dataSourceType.contains("No official consumer data source")
+            )
+            assertTrue(availability.supportedCapabilitiesLabel().startsWith("Supported: none"))
+        }
+    }
+
+    @Test
+    fun providerCatalog_eSewaDataSourceSaysMerchantApiNotWalletSync() {
+        val esewa = ProviderCatalog.eSewa()
+        assertEquals(
+            "MERCHANT API — NOT A PERSONAL WALLET SYNC INTERFACE",
+            esewa.dataSourceType
+        )
+        assertTrue(esewa.supportedCapabilitiesLabel().contains(ConnectionCapability.PAYMENT_INITIATE.name))
+    }
+
+    @Test
+    fun moneyVerificationState_hasExactlyThreeStates() {
+        assertEquals(
+            setOf(
+                MoneyVerificationState.FULLY_VERIFIED,
+                MoneyVerificationState.PARTIALLY_VERIFIED,
+                MoneyVerificationState.NOT_AVAILABLE
+            ),
+            MoneyVerificationState.entries.toSet()
+        )
+    }
 }

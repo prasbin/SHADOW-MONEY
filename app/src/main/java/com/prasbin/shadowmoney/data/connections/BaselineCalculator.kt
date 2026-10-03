@@ -7,6 +7,19 @@ sealed interface BaselineResult {
 }
 
 /**
+ * The stored baseline set presented as the ORIGINAL BALANCE: the deterministic sum of
+ * its per-source rows, the shared creation time, and the source set used. Recomputing
+ * [originalBalanceMinor] from the same stored rows always yields the same number —
+ * the baseline is reproducible and auditable.
+ */
+data class BaselineSummary(
+    val originalBalanceMinor: Long,
+    val setAtMs: Long,
+    val sourceSet: List<Provider>,
+    val rows: List<BalanceBaseline>
+)
+
+/**
  * Baselines are established only from fresh, connected, verified sources. Manual and
  * imported records can never anchor a baseline, and stale readings are refused rather
  * than silently used — a baseline is the reference every later discrepancy is judged
@@ -24,8 +37,8 @@ object BaselineCalculator {
         }
         if (connected.isEmpty()) {
             return BaselineResult.Refused(
-                "Baseline requires at least one connected, verified source. " +
-                    "Official consumer data connections are not currently available."
+                "NO VERIFIED BASELINE AVAILABLE — baseline requires at least one connected, " +
+                    "verified source. Official consumer data connections are not currently available."
             )
         }
 
@@ -43,6 +56,8 @@ object BaselineCalculator {
             )
         }
 
+        val sourceSetLabel = connected.map { it.provider!! }.distinct().sorted().joinToString(",")
+
         val baselines = connected
             .groupBy { it.provider!! }
             .map { (provider, list) ->
@@ -50,11 +65,34 @@ object BaselineCalculator {
                     provider = provider,
                     baselineMinor = list.sumOf { it.balanceMinor },
                     provenance = Provenance.CONNECTED_VERIFIED,
-                    setAtMs = nowMs
+                    setAtMs = nowMs,
+                    sourceVerifiedAtMs = list.mapNotNull { it.verifiedAtMs }.maxOrNull(),
+                    sourceSet = sourceSetLabel
                 )
             }
             .sortedBy { it.provider.name }
 
         return BaselineResult.Established(baselines)
+    }
+
+    /**
+     * Deterministic presentation of stored baseline rows: sorted rows, sum of their
+     * amounts, latest shared set time, and the recorded source set (falling back to
+     * the providers actually present in the rows). Null when no baseline exists.
+     */
+    fun summarize(baselines: List<BalanceBaseline>): BaselineSummary? {
+        if (baselines.isEmpty()) return null
+        val rows = baselines.sortedBy { it.provider.name }
+        val recordedSet = rows.first().sourceSet
+            ?.split(',')
+            ?.filter { it.isNotBlank() }
+            ?.mapNotNull { name -> runCatching { Provider.valueOf(name) }.getOrNull() }
+            ?: emptyList()
+        return BaselineSummary(
+            originalBalanceMinor = rows.sumOf { it.baselineMinor },
+            setAtMs = rows.maxOf { it.setAtMs },
+            sourceSet = recordedSet.ifEmpty { rows.map { it.provider } },
+            rows = rows
+        )
     }
 }

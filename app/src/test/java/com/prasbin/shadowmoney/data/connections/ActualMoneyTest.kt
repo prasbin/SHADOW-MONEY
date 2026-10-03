@@ -139,4 +139,48 @@ class ActualMoneyTest {
         assertTrue(view.isFullyVerified)
         assertEquals(1, view.freshSourceCount)
     }
+
+    @Test
+    fun triState_freshConnectedSources_reportFullyVerified() {
+        val view = ActualMoney.unifiedActualMoney(listOf(connected(150_000L, freshAt)), now)
+        assertEquals(MoneyVerificationState.FULLY_VERIFIED, view.state)
+    }
+
+    @Test
+    fun triState_noConnectedSources_reportsNotAvailableWithNullTotal() {
+        val view = ActualMoney.unifiedActualMoney(emptyList(), now)
+        assertEquals(MoneyVerificationState.NOT_AVAILABLE, view.state)
+        assertNull(view.connectedVerifiedTotalMinor)
+    }
+
+    @Test
+    fun triState_staleSource_reportsPartiallyVerified() {
+        val view = ActualMoney.unifiedActualMoney(listOf(connected(100_000L, staleAt)), now)
+        assertEquals(MoneyVerificationState.PARTIALLY_VERIFIED, view.state)
+    }
+
+    @Test
+    fun failedSource_isCountedAndNeverTreatedAsZero() {
+        val view = ActualMoney.unifiedActualMoney(
+            listOf(connected(150_000L, freshAt)),
+            now,
+            failedSourceCount = 1
+        )
+        assertEquals(150_000L, view.connectedVerifiedTotalMinor)
+        assertEquals(1, view.failedSourceCount)
+        assertFalse(view.isFullyVerified)
+        assertEquals(MoneyVerificationState.PARTIALLY_VERIFIED, view.state)
+        assertNotNull(view.unavailableReason)
+        assertTrue(view.unavailableReason!!.contains("failed"))
+        assertTrue(view.unavailableReason!!.contains("never counted as zero"))
+    }
+
+    @Test
+    fun failedSource_withNoConnectedSources_stillReportsNotAvailable() {
+        val view = ActualMoney.unifiedActualMoney(emptyList(), now, failedSourceCount = 2)
+        assertEquals(MoneyVerificationState.NOT_AVAILABLE, view.state)
+        assertNull(view.connectedVerifiedTotalMinor)
+        assertEquals(2, view.failedSourceCount)
+        assertTrue(view.unavailableReason!!.contains("2 failed source(s)"))
+    }
 }

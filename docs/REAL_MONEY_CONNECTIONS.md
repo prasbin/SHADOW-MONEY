@@ -1,9 +1,10 @@
-# Real-Money Connections — Foundation
+# Real-Money Connections — Foundation & Reconciliation
 
 Phase documentation for the connection architecture: what official integrations
 actually exist for the target providers, what was built, and what was deliberately
-not built. Status: **foundation complete, no production connection available** —
-this is an honest limitation of the providers, not of the code.
+not built. Status: **foundation complete, reconciliation loop complete, no
+production connection available** — this is an honest limitation of the providers,
+not of the code.
 
 ## 1. Provider research (official sources, checked 2026-10-03)
 
@@ -85,22 +86,34 @@ New package `data/connections/` (plus one DAO and two Room entities):
 | `ProviderCatalog.kt` | Research-backed availability facts per provider (the honest status text shown in the UI) |
 | `ConnectionRepository.kt` | Persistence for connection metadata + baselines; stable per-provider row id (no duplicate sources) |
 | `ConnectionSyncCoordinator.kt` | Catalog bootstrap, adapter sync, staleness downgrade, connected-source projection. Production adapter map is empty |
-| `ActualMoney.kt` | Unified actual-money view with partial/stale marking |
-| `BaselineCalculator.kt` | Baseline establishment — refuses without fresh connected sources |
-| `DiscrepancyEngine.kt` | Pure state machine: `NO_CONNECTED_SOURCES`, `CONNECTION_ERROR`, `REAUTH_REQUIRED`, `CONNECTION_STALE`, `NO_BASELINE`, `EXPECTED_CHANGE`, `UNEXPLAINED_REDUCTION`, `ACTUAL_DISCREPANCY` |
-| `data/ConnectionDao.kt`, `data/model/FinancialConnection.kt` | Room DAO + entities (`financial_connections`, `balance_baselines`) |
+| `ActualMoney.kt` | Unified actual-money view — tri-state verification (`FULLY_VERIFIED` / `PARTIALLY_VERIFIED` / `NOT_AVAILABLE`), failed sources excluded and counted (never zero) |
+| `BaselineCalculator.kt` | Baseline establishment — refuses without fresh connected sources; per-row audit trail (`sourceVerifiedAtMs`, `sourceSet`); `BaselineCalculator.summarize` deterministically reproduces the original balance |
+| `DiscrepancyEngine.kt` | Pure reconciliation engine: `NO_CONNECTED_SOURCES`, `CONNECTION_ERROR`, `REAUTH_REQUIRED`, `CONNECTION_STALE`, `NO_BASELINE`, `EXPECTED_CHANGE`, `UNEXPLAINED_REDUCTION`, `ACTUAL_DISCREPANCY`, with original/current/difference/explained/unexplained figures and affected sources |
+| `ReconciliationActivity.kt` | `LedgerReconciliationActivity` — bounded ledger aggregate per source since the baseline, split into verified / imported / manual net movement |
+| `data/ConnectionDao.kt`, `data/model/FinancialConnection.kt` | Room DAO (incl. atomic `replaceBaselines`) + entities (`financial_connections`, `balance_baselines` with nullable audit columns) |
 
-Database: **Room schema v8** — additive `MIGRATION_7_8` creates only the two new
-tables; no existing table, column, or row changes. Migration verified by a genuine
-populated v7 → v8 test.
+Database: **Room schema v9** — additive `MIGRATION_8_9` adds two nullable audit
+columns to `balance_baselines` (`sourceVerifiedAtMs`, `sourceSet`); no existing
+table, column, or row changes (legacy rows simply read NULL). The stored baseline
+set is now replaced atomically (`ConnectionDao.replaceBaselines`, `@Transaction`),
+so a stale row from a previous set can never inflate the original balance.
+Migration verified by a genuine populated v8 → v9 test (legacy rows preserved with
+NULL audit columns, new rows round-trip audit fields).
 
 UI: `Screen.Connections` (`connections` route) — a SYSTEM → Connections row opens
-the Connections screen with: provider cards (status chip + interface/balance/
-transaction/payment/auth/approval facts + honest note), actual-money panel,
-baseline panel (`SET BASELINE FROM CONNECTED SOURCES` — refuses honestly while no
-connected source exists), discrepancy panel, provenance-tag panel, and a security
-footer. The Activity list now labels each record's provenance (`MANUAL ENTRY` /
-`IMPORTED`) on its date line.
+the Connections screen with: provider cards (status chip + interface / data-source
+type / balance / transaction / payment / auth / approval facts + supported
+capabilities + last verification/sync timestamp + honest note + safe next step —
+eSewa states `MERCHANT API — NOT A PERSONAL WALLET SYNC INTERFACE`), actual-money
+panel (tri-state chip, fresh/stale/unverified/failed counts), baseline panel
+(`NO VERIFIED BASELINE AVAILABLE` or original balance + source set + per-row audit,
+`SET BASELINE FROM CONNECTED SOURCES` refusing honestly while no connected source
+exists), a reconciliation panel (actual-money state chip, status chip incl.
+`MONEY BELOW ORIGINAL BALANCE` / `UNEXPLAINED REDUCTION`, original/current/
+difference/explained/unexplained figures, affected sources, explanation,
+connection-health counts), provenance-tag panel, and a security footer. The
+Activity list now labels each record's provenance (`MANUAL ENTRY` / `IMPORTED`)
+on its date line.
 
 ## 4. Security boundaries (unchanged, by design)
 
@@ -124,11 +137,40 @@ footer. The Activity list now labels each record's provenance (`MANUAL ENTRY` /
   capabilities, failed/auth/unavailable handling, catalog honesty, duplicate-row
   prevention, staleness refresh, baseline establish + all refusal paths, end-to-end
   discrepancy pipeline.
-- `ConnectionMigrationTest` — populated v7 → v8: all data preserved, new tables
-  exist, connection/baseline round-trip, unique provider enforced.
-- Existing migration tests chained through `MIGRATION_7_8`.
+- `ConnectionMigrationTest` — populated v7 → v8 (data preserved, new tables,
+  round-trip, unique provider) and populated v8 → v9 (baseline rows preserved,
+  nullable audit columns added, audit fields round-trip).
+- `BaselineSummaryTest` — per-row audit fields (`sourceVerifiedAtMs`, `sourceSet`)
+  and deterministic `BaselineCalculator.summarize` (original balance = sum of rows,
+  order-independent, legacy-row fallback).
+- `LedgerReconciliationActivityTest` — provenance-split ledger aggregation over the
+  bounded SQL group-by query; verified/imported/manual net movement kept separate;
+  rows before the window excluded; unknown source strings treated as imported.
+- `ActualMoneyTest` additionally covers the tri-state verification states and
+  failed-source counting (excluded, never counted as zero).
+- `DiscrepancyEngineTest` additionally covers reconciliation figures (original /
+  current / difference / explained / unexplained), explained reductions flagged
+  below the original balance, provenance-split movement, and affected sources.
+- Existing migration tests chained through `MIGRATION_7_8` and `MIGRATION_8_9`.
 
-## 6. Future path (when a provider publishes an official consumer API)
+## 6. Import as a first-class source (evidence stance)
+
+- **SUPPORTED — generic CSV import**: the app's format-agnostic CSV importer
+  accepts user-provided files with a header row and standard columns (date,
+  amount, direction, description). It assumes **no per-provider format**: nothing
+  about Sanima/Global IME/eSewa statement layouts is encoded anywhere, because no
+  provider export format was ever reverse-engineered or claimed. Imported rows are
+  tagged `IMPORTED` (`source = "IMPORT_FILE"`) at the row level and feed the
+  reconciliation loop only through `importedNetChangeMinor` — visible as explained
+  movement, never as verified data.
+- **NOT SUPPORTED — PDF statements**: there is no PDF parser; bank/wallet PDF
+  statements cannot be imported. This is a documented limitation, not a silent
+  failure — no partial or guessed parsing exists.
+- **Provenance is never upgraded**: an imported row stays `IMPORTED` forever, no
+  matter how consistent its numbers are with a connected baseline. Import evidence
+  explains movement; it never makes a source "connected" or a baseline "verified".
+
+## 7. Future path (when a provider publishes an official consumer API)
 
 1. Implement `ProviderAdapter` for that provider using only its official,
    approved interface.
@@ -139,17 +181,35 @@ footer. The Activity list now labels each record's provenance (`MANUAL ENTRY` /
 Until then, every provider honestly reports `UNAVAILABLE` with the reason from the
 research table above.
 
-## 7. Verification (2026-10-03)
+## 8. Verification (2026-10-03)
 
+Foundation phase (previous session):
 - Tests: **759 / 72 suites / 0 failures / 0 errors** (55 new across the five
   connection suites listed in §5; `BudgetsViewModelTest` also fixed — its hardcoded
   `monthKey = "2026-09"` was a month-rollover time bomb, now
   `BudgetCalendar.currentMonthKey()`).
+
+Reconciliation phase (this session):
+- Tests: **781 / 74 suites / 0 failures / 0 errors** (22 new: `BaselineSummaryTest`
+  and `LedgerReconciliationActivityTest` suites plus extensions to
+  `DiscrepancyEngineTest`, `ActualMoneyTest`, `ConnectionSyncCoordinatorTest`,
+  `ConnectionArchitectureTest`; populated v8 → v9 migration test added to
+  `ConnectionMigrationTest`; all six pre-existing migration tests re-chained through
+  `MIGRATION_8_9`).
 - Lint: 0 errors / 27 warnings (unchanged). `assembleDebug` + `assembleRelease` OK;
-  `apksigner verify` → v2 scheme, CN=Prasbin Dhungana.
-- Physical device (YPA6RWNB7L7HPBRK) was disconnected this session; verification was
-  performed on the Android 16 emulator instead: cold start, all five tabs, Settings →
-  Connections (provider cards + all panels + baseline refusal message), `· MANUAL ENTRY`
-  label on a recorded transaction, no crashes (logcat clean), no `INTERNET` permission
+  `apksigner verify` → v2 scheme, CN=Prasbin Dhungana. KSP schema `9.json` committed.
+- Physical device (YPA6RWNB7L7HPBRK) remained disconnected this session; verification
+  on the Android 16 emulator (fresh install, `pm clear` first): Connections screen —
+  enriched provider cards (`DATA SOURCE TYPE`, eSewa
+  `MERCHANT API — NOT A PERSONAL WALLET SYNC INTERFACE`, `LAST VERIFICATION/SYNC:
+  Never — no official consumer interface`, supported-capabilities line, `Next step:`
+  safe action), `ACTUAL MONEY NOT AVAILABLE` tri-state chip, baseline panel
+  `NO VERIFIED BASELINE AVAILABLE` + honest refusal message ("…official consumer data
+  connections are not currently available"), full `RECONCILIATION` panel (status
+  chips, `ORIGINAL BALANCE: NO VERIFIED BASELINE AVAILABLE`, explanation,
+  `CONNECTION HEALTH 0 connected · 0 stale · 0 error · 0 reauth`), provenance panel
+  + security footer, `Settings → Backup & Restore → Database schema: v9` (now derived
+  from `APP_SCHEMA_VERSION` instead of a hardcoded string), all five tabs in pristine
+  empty state, no crashes (logcat clean), no `INTERNET` permission
   (`dumpsys package`), test data cleared afterwards (`pm clear` → pristine first-run
   state restored).

@@ -1,11 +1,13 @@
 package com.prasbin.shadowmoney.presentation.screen.connections
 
 import androidx.lifecycle.ViewModel
+import com.prasbin.shadowmoney.data.Money
 import com.prasbin.shadowmoney.data.connections.ActualMoney
 import com.prasbin.shadowmoney.data.connections.ActualMoneyView
 import com.prasbin.shadowmoney.data.connections.BalanceBaseline
 import com.prasbin.shadowmoney.data.connections.BaselineCalculator
 import com.prasbin.shadowmoney.data.connections.BaselineResult
+import com.prasbin.shadowmoney.data.connections.BaselineSummary
 import com.prasbin.shadowmoney.data.connections.ConnectionRepository
 import com.prasbin.shadowmoney.data.connections.ConnectionStatus
 import com.prasbin.shadowmoney.data.connections.ConnectionSyncCoordinator
@@ -17,6 +19,7 @@ import com.prasbin.shadowmoney.data.connections.NormalizedFinancialSource
 import com.prasbin.shadowmoney.data.connections.Provenance
 import com.prasbin.shadowmoney.data.connections.ProviderAvailability
 import com.prasbin.shadowmoney.data.connections.ProviderCatalog
+import com.prasbin.shadowmoney.data.connections.ReconciliationActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,6 +28,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -32,6 +37,7 @@ data class ConnectionsUiState(
     val providers: List<ProviderAvailability> = emptyList(),
     val connections: List<FinancialConnection> = emptyList(),
     val baselines: List<BalanceBaseline> = emptyList(),
+    val baselineSummary: BaselineSummary? = null,
     val actualMoney: ActualMoneyView? = null,
     val discrepancy: DiscrepancyResult? = null,
     val baselineMessage: String? = null
@@ -41,11 +47,13 @@ data class ConnectionsUiState(
  * Drives the Connections screen from the real connection architecture: honest
  * provider availability, stored connection state, the unified actual-money view,
  * baseline establishment (refuses without connected sources), and the pure
- * discrepancy engine. Never fabricates a connection or a balance.
+ * reconciliation engine fed with recorded ledger activity since the baseline was
+ * set. Never fabricates a connection or a balance.
  */
 class ConnectionsViewModel(
     private val repository: ConnectionRepository,
     private val coordinator: ConnectionSyncCoordinator,
+    private val activity: ReconciliationActivity? = null,
     private val clock: () -> Long = { System.currentTimeMillis() }
 ) : ViewModel() {
 
@@ -58,6 +66,26 @@ class ConnectionsViewModel(
         repository.observeBaselines(),
         baselineMessage
     ) { connections, baselines, message ->
+        Triple(connections, baselines, message)
+    }.flatMapLatest { (connections, baselines, message) ->
+        val summary = BaselineCalculator.summarize(baselines)
+        flow {
+            val recorded = if (summary != null && activity != null) {
+                runCatching { activity.netActivitySince(summary.setAtMs) }.getOrNull()
+            } else {
+                null
+            }
+            emit(buildState(connections, baselines, summary, recorded, message))
+        }
+    }.stateIn(scope, SharingStarted.Eagerly, ConnectionsUiState())
+
+    private fun buildState(
+        connections: List<FinancialConnection>,
+        baselines: List<BalanceBaseline>,
+        summary: BaselineSummary?,
+        recorded: ReconciliationActivity.RecordedActivity?,
+        message: String?
+    ): ConnectionsUiState {
         val now = clock()
         val sources = connections
             .filter {
@@ -81,25 +109,40 @@ class ConnectionsViewModel(
             connections.any { it.status == ConnectionStatus.CONNECTED } -> ConnectionStatus.CONNECTED
             else -> null
         }
+        val affectedProviders = if (worstStatus == null) {
+            emptyList()
+        } else {
+            connections.filter { it.status == worstStatus }.map { it.provider }.distinct()
+                .sortedBy { it.name }
+        }
+        val failedSourceCount = connections.count { it.status == ConnectionStatus.ERROR }
         val latestVerified = if (sources.isEmpty()) null else sources.sumOf { it.balanceMinor }
 
-        ConnectionsUiState(
+        return ConnectionsUiState(
             providers = ProviderCatalog.all(),
             connections = connections,
             baselines = baselines,
-            actualMoney = ActualMoney.unifiedActualMoney(sources, now),
+            baselineSummary = summary,
+            actualMoney = ActualMoney.unifiedActualMoney(
+                sources = sources,
+                nowMs = now,
+                failedSourceCount = failedSourceCount
+            ),
             discrepancy = DiscrepancyEngine.evaluate(
                 DiscrepancyInput(
                     connectedSourceCount = connectedCount,
                     status = worstStatus,
-                    baselineMinor = baselines.firstOrNull()?.baselineMinor,
-                    recordedNetChangeMinor = 0L,
+                    affectedProviders = affectedProviders,
+                    baselineMinor = summary?.originalBalanceMinor,
+                    verifiedNetChangeMinor = recorded?.verifiedNetChangeMinor ?: 0L,
+                    importedNetChangeMinor = recorded?.importedNetChangeMinor ?: 0L,
+                    manualNetChangeMinor = recorded?.manualNetChangeMinor ?: 0L,
                     latestVerifiedBalanceMinor = latestVerified
                 )
             ),
             baselineMessage = message
         )
-    }.stateIn(scope, SharingStarted.Eagerly, ConnectionsUiState())
+    }
 
     init {
         scope.launch {
@@ -112,7 +155,8 @@ class ConnectionsViewModel(
 
     /**
      * Attempts to establish baselines from connected sources. With no official
-     * consumer connections available this honestly refuses and reports why.
+     * consumer connections available this honestly refuses and reports why. On
+     * success the message states the original balance and the source set used.
      */
     fun setBaselineFromConnectedSources() {
         scope.launch {
@@ -127,8 +171,14 @@ class ConnectionsViewModel(
             when (result) {
                 is BaselineResult.Established -> {
                     repository.setBaselines(result.baselines)
-                    baselineMessage.value =
+                    val summary = BaselineCalculator.summarize(result.baselines)
+                    baselineMessage.value = if (summary != null) {
+                        "Baseline set: original balance " +
+                            "${Money.formatNpr(summary.originalBalanceMinor)} from " +
+                            "${summary.sourceSet.joinToString(", ") { it.name }}."
+                    } else {
                         "Baseline set from ${result.baselines.size} connected source(s)."
+                    }
                 }
                 is BaselineResult.Refused -> baselineMessage.value = result.reason
             }

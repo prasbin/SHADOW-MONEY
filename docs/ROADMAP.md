@@ -1,6 +1,16 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Real Money Connection Foundation ✅ COMPLETE
+## Current Status: Real Money Reconciliation & Provider Data Activation ✅ COMPLETE
+
+Audit-grade reconciliation + honest provider-data activation (no fabricated APIs, no credential/OTP/PIN storage, no network permission — app stays offline; **schema change v8 → v9**; version stays `1.0.0` / versionCode 2), details in `docs/REAL_MONEY_CONNECTIONS.md`:
+- **Reproducible baseline**: original balance = deterministic sum of stored rows (`BaselineCalculator.summarize`) with per-row audit trail (`sourceVerifiedAtMs`, `sourceSet`, nullable columns via additive `MIGRATION_8_9`); fixed the `firstOrNull()?.baselineMinor` single-row bug; baseline replacement is atomic (`ConnectionDao.replaceBaselines`, `@Transaction`) so stale rows can never inflate the sum
+- **Reconciliation loop**: `LedgerReconciliationActivity` + bounded `TransactionDao.netChangeBySourceSince` aggregate feed `DiscrepancyEngine` with provenance-split movement (verified / imported / manual) and full figures (original, current, difference, explained, unexplained, affected sources); explained reductions flagged `MONEY BELOW ORIGINAL BALANCE`, residuals reported as `UNEXPLAINED REDUCTION` / `UNEXPLAINED INFLOW`
+- **Actual-money tri-state**: `FULLY_VERIFIED` / `PARTIALLY_VERIFIED` / `NOT_AVAILABLE`; failed sources excluded, counted, never zeroed
+- **Connections UI**: reconciliation panel (status chips, figures, connection health), `NO VERIFIED BASELINE AVAILABLE`, enriched provider cards (`dataSourceType` incl. eSewa `MERCHANT API — NOT A PERSONAL WALLET SYNC INTERFACE`, `safeNextAction`, capabilities, last verification/sync time)
+- **Import evidence stance**: generic CSV importer documented as the only supported import (format-agnostic, no per-provider format assumed); PDF statements documented as NOT supported; imported provenance never upgrades to connected
+- Verification: **781 tests / 74 suites / 0 failures / 0 errors** (22 new across 2 new suites + extensions); lint **0 errors / 27 warnings**; `assembleDebug`/`assembleRelease` OK; `apksigner verify` → v2, CN=Prasbin Dhungana; KSP schema `9.json` committed, backup schema version follows to 9; docs updated, work committed and pushed
+
+Previous status: Real Money Connection Foundation ✅ COMPLETE
 
 Provider research + honest connection architecture (no fake connectors, no credential/OTP/PIN storage, no network permission — app stays offline; **schema change v7 → v8**; version stays `1.0.0` / versionCode 2), details in `docs/REAL_MONEY_CONNECTIONS.md`:
 - **Sanima Sajilo eBanking** → `NOT AVAILABLE THROUGH OFFICIAL PUBLIC CONSUMER API`; **Global IME Global Smart Plus** → `NOT AVAILABLE THROUGH OFFICIAL PUBLIC CONSUMER API`; **eSewa** → official public docs exist but `MERCHANT PAYMENT CATEGORY; CONSUMER WALLET DATA SYNC NOT AVAILABLE`
