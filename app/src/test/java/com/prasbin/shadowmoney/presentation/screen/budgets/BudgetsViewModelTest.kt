@@ -32,7 +32,7 @@ class BudgetsViewModelTest {
     private lateinit var categoryDao: com.prasbin.shadowmoney.data.CategoryDao
     private lateinit var accountDao: com.prasbin.shadowmoney.data.AccountDao
 
-    private val monthKey = "2026-09"
+    private val monthKey = BudgetCalendar.currentMonthKey()
     private val monthStart = BudgetCalendar.monthStart(monthKey)
 
     @Before

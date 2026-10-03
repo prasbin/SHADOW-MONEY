@@ -6,8 +6,10 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.prasbin.shadowmoney.data.backup.BackupDao
 import com.prasbin.shadowmoney.data.model.Account
+import com.prasbin.shadowmoney.data.model.BalanceBaselineEntity
 import com.prasbin.shadowmoney.data.model.Budget
 import com.prasbin.shadowmoney.data.model.Category
+import com.prasbin.shadowmoney.data.model.FinancialConnectionEntity
 import com.prasbin.shadowmoney.data.model.Goal
 import com.prasbin.shadowmoney.data.model.Opportunity
 import com.prasbin.shadowmoney.data.model.TelecomPackage
@@ -18,8 +20,8 @@ import com.prasbin.shadowmoney.data.model.WorkItem
 import kotlinx.coroutines.flow.Flow
 
 @Database(
-    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class, WorkItem::class, TelecomSim::class, TelecomPackage::class, TelecomSubscription::class, Opportunity::class],
-    version = 7,
+    entities = [Account::class, Category::class, Transaction::class, Goal::class, Budget::class, WorkItem::class, TelecomSim::class, TelecomPackage::class, TelecomSubscription::class, Opportunity::class, FinancialConnectionEntity::class, BalanceBaselineEntity::class],
+    version = 8,
     exportSchema = true
 )
 abstract class ShadowMoneyDatabase : RoomDatabase() {
@@ -33,6 +35,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
     abstract fun telecomDao(): TelecomDao
     abstract fun opportunityDao(): OpportunityDao
     abstract fun backupDao(): BackupDao
+    abstract fun connectionDao(): ConnectionDao
 
     companion object {
         @Volatile
@@ -47,7 +50,7 @@ abstract class ShadowMoneyDatabase : RoomDatabase() {
                 )
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                        MIGRATION_5_6, MIGRATION_6_7
+                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8
                     )
                     .build()
                 INSTANCE = instance
@@ -232,5 +235,33 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
 val MIGRATION_6_7 = object : Migration(6, 7) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE `transactions` ADD COLUMN `externalRef` TEXT DEFAULT NULL")
+    }
+}
+
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `financial_connections` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `provider` TEXT NOT NULL,
+                `status` TEXT NOT NULL,
+                `capabilities` TEXT NOT NULL,
+                `availabilityNote` TEXT NOT NULL,
+                `lastVerifiedAtMs` INTEGER,
+                `verifiedBalanceMinor` INTEGER,
+                `updatedAtMs` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_financial_connections_provider` ON `financial_connections` (`provider`)")
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `balance_baselines` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `provider` TEXT NOT NULL,
+                `baselineMinor` INTEGER NOT NULL,
+                `provenance` TEXT NOT NULL,
+                `setAtMs` INTEGER NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_balance_baselines_provider` ON `balance_baselines` (`provider`)")
     }
 }

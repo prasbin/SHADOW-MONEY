@@ -216,6 +216,11 @@ fun SettingsScreen(navController: androidx.navigation.NavHostController? = null)
                 subtitle = "Income-growth pipeline",
                 onClick = { navController?.navigate("opportunities") }
             )
+            com.prasbin.shadowmoney.presentation.theme.SystemListRow(
+                title = "Connections",
+                subtitle = "Official bank/wallet links · honest status",
+                onClick = { navController?.navigate("connections") }
+            )
 
             com.prasbin.shadowmoney.presentation.theme.SystemSectionHeader("Analysis")
             com.prasbin.shadowmoney.presentation.theme.SystemListRow(
@@ -290,7 +295,7 @@ private fun BackupSection(
                 color = DarkOnSurfaceVariant
             )
             Text(
-                text = "Database schema: v7",
+                text = "Database schema: v8",
                 style = MaterialTheme.typography.bodySmall,
                 color = DarkOnSurfaceVariant
             )

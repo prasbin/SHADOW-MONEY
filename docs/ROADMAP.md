@@ -1,6 +1,14 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: v1.1 Engineering Hardening ✅ COMPLETE
+## Current Status: Real Money Connection Foundation ✅ COMPLETE
+
+Provider research + honest connection architecture (no fake connectors, no credential/OTP/PIN storage, no network permission — app stays offline; **schema change v7 → v8**; version stays `1.0.0` / versionCode 2), details in `docs/REAL_MONEY_CONNECTIONS.md`:
+- **Sanima Sajilo eBanking** → `NOT AVAILABLE THROUGH OFFICIAL PUBLIC CONSUMER API`; **Global IME Global Smart Plus** → `NOT AVAILABLE THROUGH OFFICIAL PUBLIC CONSUMER API`; **eSewa** → official public docs exist but `MERCHANT PAYMENT CATEGORY; CONSUMER WALLET DATA SYNC NOT AVAILABLE`
+- **Source-of-truth hierarchy**: connected verified data > unified actual money view > intelligence; manual and imported records keep their own provenance tags and are never merged into a connected total
+- **Built**: `ProviderAdapter` (interface only, production adapter map empty), `ProviderCatalog`, connection/baseline repositories + DAOs, sync coordinator (staleness), `ActualMoney`, `BaselineCalculator` (refuses without fresh connected sources), `DiscrepancyEngine` (pure state machine), `MIGRATION_7_8` (two additive tables, schema `8.json` committed, backup schema version follows), System → Connections screen, `· MANUAL ENTRY` / `· IMPORTED` provenance labels on Activity date lines
+- Verification: **759 tests / 72 suites / 0 failures / 0 errors** (55 new across 5 suites); lint **0 errors / 27 warnings**; `assembleDebug`/`assembleRelease` OK; `apksigner verify` → v2, CN=Prasbin Dhungana; device verification on Android 16 emulator (physical device not connected this session); fixed a pre-existing month-rollover time bomb in `BudgetsViewModelTest`; docs updated, work committed and pushed
+
+Previous status: v1.1 Engineering Hardening ✅ COMPLETE
 
 An engineering pass (not a phase — Phases 0–13 remain the complete list, no Phase 14; **no schema change — still Room v7**; version stays `1.0.0` / versionCode 2), baseline `a5a573c`:
 - **Room schema artifacts committed**: genuine KSP-generated JSONs for versions **1–7** now live in `app/app/schemas/` under version control (v2–v7 built from their actual version-bump commits in disposable worktrees; v1 built from its Phase-1 commit with `exportSchema` temporarily enabled — historically false, entities untouched); `.gitignore` un-ignores `app/app/` so future entity changes surface as visible schema diffs
@@ -148,6 +156,7 @@ Phase 2 foundation:
 | 11 | Local Financial Assistant | ✅ Complete |
 | 12 | Security / Backup / Restore | ✅ Complete |
 | 13 | Real Device Testing / Release | ✅ Complete |
+| — | Real Money Connection Foundation | ✅ Complete |
 
 ## Financial Objective
 

@@ -59,6 +59,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.prasbin.shadowmoney.data.Money
 import com.prasbin.shadowmoney.data.ShadowMoneyDatabase
+import com.prasbin.shadowmoney.data.connections.label
+import com.prasbin.shadowmoney.data.connections.provenanceOfTransactionSource
 import com.prasbin.shadowmoney.data.model.TRANSACTION_DIRECTION_INCOME
 import com.prasbin.shadowmoney.data.model.TRANSACTION_DIRECTION_OUTFLOW
 import com.prasbin.shadowmoney.presentation.navigation.Screen
@@ -260,7 +262,9 @@ private fun TransactionCard(view: TransactionListView) {
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 Text(
-                    transactionDateFormat.format(Date(transaction.transactionTimestamp)),
+                    transactionDateFormat.format(Date(transaction.transactionTimestamp)) +
+                        " · " +
+                        provenanceOfTransactionSource(transaction.source).label(),
                     style = MaterialTheme.typography.labelSmall,
                     color = DarkOnSurfaceVariant
                 )

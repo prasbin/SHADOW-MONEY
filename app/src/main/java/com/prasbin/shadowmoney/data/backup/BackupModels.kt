@@ -2,7 +2,7 @@ package com.prasbin.shadowmoney.data.backup
 
 const val BACKUP_FORMAT_NAME = "shadow-money-backup"
 const val BACKUP_FORMAT_VERSION = 1
-const val APP_SCHEMA_VERSION = 7
+const val APP_SCHEMA_VERSION = 8
 const val BACKUP_CHECKSUM_ALGORITHM = "SHA-256"
 const val MAX_BACKUP_BYTES = 10 * 1024 * 1024
 

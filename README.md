@@ -4,6 +4,13 @@ Personal Android financial-management and income-growth application.
 
 ## Status
 
+**Real Money Connection Foundation** ✅ COMPLETE (provider research + honest connection architecture — no fake connectors, no credentials, app stays offline; **Room schema change: v7 → v8**; version stays `1.0.0` / versionCode 2; full write-up in `docs/REAL_MONEY_CONNECTIONS.md`):
+- **Provider research (official sources)**: Sanima Sajilo eBanking → `NOT AVAILABLE THROUGH OFFICIAL PUBLIC CONSUMER API` (customer portals/apps only); Global IME Global Smart Plus → `NOT AVAILABLE THROUGH OFFICIAL PUBLIC CONSUMER API` (bank-owned customer app only); eSewa → `OFFICIAL API EXISTS — MERCHANT PAYMENT CATEGORY; CONSUMER WALLET DATA SYNC NOT AVAILABLE` (`developer.esewa.com.np` is merchant/partner-only)
+- **Connection domain**: `ProviderAdapter` read-only interface with **zero production implementations** (empty adapter map by design), research-backed `ProviderCatalog`, connection/baseline Room persistence, sync coordinator with staleness downgrade, unified actual-money view (connected-verified sources only — manual/imported records stay separately provenanced and are never folded in), baseline establishment that refuses without fresh connected sources, and a pure discrepancy state machine (`NO_CONNECTED_SOURCES` → … → `ACTUAL_DISCREPANCY`)
+- **Room v8**: additive `MIGRATION_7_8` creates only `financial_connections` + `balance_baselines` (KSP schema `8.json` committed); backup `APP_SCHEMA_VERSION` follows to 8; all six existing migration tests chain through it
+- **System → Connections screen**: honest provider cards (UNAVAILABLE reasons, capability/approval rows), ACTUAL MONEY / BASELINE / DISCREPANCY / PROVENANCE panels with real refusal messages, security footer; transaction date lines now carry `· MANUAL ENTRY` / `· IMPORTED` provenance labels
+- Verification: **759 tests / 72 suites / 0 failures / 0 errors** (55 new); lint **0 errors / 27 warnings**; `assembleDebug` + `assembleRelease` OK (apksigner v2, CN=Prasbin Dhungana); verified on Android 16 emulator (physical device disconnected this session); also fixed a month-rollover time bomb in `BudgetsViewModelTest` (hardcoded `2026-09` month key → `BudgetCalendar.currentMonthKey()`)
+
 **v1.1 Engineering Hardening** ✅ COMPLETE (an engineering pass, not a phase — Phases 0–13 remain the complete list, no Phase 14; **no schema change, still Room v7**; version stays `1.0.0` / versionCode 2):
 - **Room schema artifacts are now version-controlled**: `app/app/schemas/…ShadowMoneyDatabase/` holds genuine KSP-generated JSONs for **versions 1–7** (v2–v7 exported from their real version-bump commits via disposable git worktrees; v1 generated from its Phase-1 commit with `exportSchema` temporarily enabled in the worktree — historically `false`, entities untouched); `.gitignore` no longer excludes `app/app/`, so any future entity change produces a visible schema diff for review/CI
 - **Legacy Jobs cleanup**: the dead `JobsScreen`, `Screen.Jobs`, and its NavHost registration were removed (zero navigators, tests, or dependencies ever referenced them); the Work screen is untouched
@@ -96,7 +103,7 @@ A practical, local-first opportunity tracking and organization system (manual tr
 - Kotlin
 - Jetpack Compose
 - Material 3 (Dark Theme)
-- Room / SQLite (v7)
+- Room / SQLite (v8)
 - DataStore (preferences)
 - WorkManager
 - Android Storage Access Framework
