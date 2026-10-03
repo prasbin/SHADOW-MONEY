@@ -1,6 +1,20 @@
 # SHADOW MONEY — Roadmap
 
-## Current Status: Real Money Reconciliation & Provider Data Activation ✅ COMPLETE
+## Current Status: Live Financial Connectivity Options Investigation ✅ COMPLETE
+
+Research-only phase: official-source investigation of every legitimate route to real
+financial connectivity for Sanima Sajilo eBanking, Global IME Global Smart Plus and
+eSewa (**no code changes, no schema change — still Room v9**; version stays `1.0.0` /
+versionCode 2), details in `docs/LIVE_CONNECTIVITY_RESEARCH.md`:
+- **Provider facts re-verified (research date 2026-10-03)**: Sanima/Global IME publish no developer portal or account-data API (customer channels only; Sanima's public API work = bank-to-bank Standard Chartered INR); eSewa official docs fetched directly = merchant payment flows only, no consumer wallet balance/history API
+- **Capability matrix** (cells `YES`/`NO`/`PARTNER ONLY`/`UNKNOWN`) across providers, merchant APIs, NCHL connectIPS (whitelisted balance enquiry = `PARTNER ONLY`), LxB Connect precedent, APINepal, Swippee and non-covering global aggregators; costs all `NOT PUBLICLY DISCLOSED` except Swippee's published tiers; security flags `RED`/`GREEN`/`UNKNOWN` per route
+- **Screening**: payment gateways (APINepal, PayBridgeNP) excluded for balance/history; SEO directory pages and one unverified "draft Open Banking Framework" claim discarded/flagged; no statutory open-banking framework in Nepal; Plaid/Tink/TrueLayer/Yapily/Fintoc have no Nepal coverage
+- **Regulatory context**: NRB Fintech Strategy for Digital Financial Services (2026/27–2030/31) official PDF (2026-09-15, enabling — no data-sharing mandate); NRB Regulatory Sandbox effective 2026-05-14 (Nepal-incorporated entities, 45-day windows, first cohort graduated)
+- **Ranked paths**: (1) user-mediated statement export → local import (available now, free, on-device); (2) partner/institutional applications (bank/vendor, NCHL membership, eSewa merchant for payments only, NRB sandbox); (3) third-party PDF parsing (optional, statements leave device — not recommended)
+- **Decision: `B — PARTNER APPLICATION REQUIRED`** — what must be obtained listed precisely; explicit caveat that no account-information API for personal budgeting is a published product in Nepal as of the research date; until then PATH 1 is the sanctioned real-data route and provider cards keep reporting `UNAVAILABLE` honestly
+- **Boundaries honored**: no adapter built, no fake adapter, no endpoint invented, no credential/OTP/PIN requested or stored, no scraping/app automation/Accessibility harvesting, no device or app data touched; docs only (`docs/LIVE_CONNECTIVITY_RESEARCH.md` + pointers in `docs/REAL_MONEY_CONNECTIONS.md`, README, this file)
+
+Previous status: Real Money Reconciliation & Provider Data Activation ✅ COMPLETE
 
 Audit-grade reconciliation + honest provider-data activation (no fabricated APIs, no credential/OTP/PIN storage, no network permission — app stays offline; **schema change v8 → v9**; version stays `1.0.0` / versionCode 2), details in `docs/REAL_MONEY_CONNECTIONS.md`:
 - **Reproducible baseline**: original balance = deterministic sum of stored rows (`BaselineCalculator.summarize`) with per-row audit trail (`sourceVerifiedAtMs`, `sourceSet`, nullable columns via additive `MIGRATION_8_9`); fixed the `firstOrNull()?.baselineMinor` single-row bug; baseline replacement is atomic (`ConnectionDao.replaceBaselines`, `@Transaction`) so stale rows can never inflate the sum

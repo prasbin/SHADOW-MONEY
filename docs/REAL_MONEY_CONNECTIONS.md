@@ -8,6 +8,11 @@ not of the code.
 
 ## 1. Provider research (official sources, checked 2026-10-03)
 
+Re-verified and extended by the Live Financial Connectivity Options
+Investigation (research date 2026-10-03) — capability matrix, aggregator
+screening, NRB/regulatory routes, ranked paths and the PARTNER APPLICATION
+REQUIRED decision are in `docs/LIVE_CONNECTIVITY_RESEARCH.md`.
+
 | Provider | Official public consumer API? | Balance read | Transaction read | Payment/transfer initiate | Verdict |
 |---|---|---|---|---|---|
 | **Sanima — Sajilo eBanking** | No | Not available | Not available | Not available | `NOT AVAILABLE THROUGH OFFICIAL PUBLIC CONSUMER API` |
